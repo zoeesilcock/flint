@@ -9,6 +9,149 @@ const imgui = @import("imgui.zig").c;
 
 const DebugAllocator = @import("GameLib.zig").DebugAllocator;
 
+// Displays a graph of the frame timings for the last 300 frames.
+pub const FrameTimingsWindow = struct {
+    current_frame_index: u32,
+    performance_frequency: u64,
+    frame_times: [MAX_FRAME_TIME_COUNT]FrameTimes,
+    position: imgui.ImVec2,
+    visible: bool,
+
+    const MAX_FRAME_TIME_COUNT: u32 = 300;
+
+    const FrameTimeType = enum(u32) {
+        start,
+        tick,
+        draw,
+        frame,
+    };
+
+    const FrameTimes = struct {
+        start: u64 = 0,
+        tick: u64 = 0,
+        draw: u64 = 0,
+        frame: u64 = 0,
+    };
+
+    pub fn init(self: *FrameTimingsWindow, frequency: u64) void {
+        self.current_frame_index = 0;
+        self.performance_frequency = frequency;
+        self.frame_times = [1]FrameTimes{.{}} ** MAX_FRAME_TIME_COUNT;
+        self.position = imgui.ImVec2{ .x = 5, .y = 5 };
+    }
+
+    pub fn addFrameTime(self: *FrameTimingsWindow, frame_time: u64) void {
+        self.current_frame_index += 1;
+        if (self.current_frame_index >= MAX_FRAME_TIME_COUNT) {
+            self.current_frame_index = 0;
+        }
+
+        self.setFrameTime(.start, frame_time);
+    }
+
+    pub fn setFrameTime(self: *FrameTimingsWindow, frame_type: FrameTimeType, frame_time: u64) void {
+        switch (frame_type) {
+            .start => self.frame_times[self.current_frame_index].start = frame_time,
+            .tick => self.frame_times[self.current_frame_index].tick = frame_time,
+            .draw => self.frame_times[self.current_frame_index].draw = frame_time,
+            .frame => self.frame_times[self.current_frame_index].frame = frame_time,
+        }
+    }
+
+    /// Display the frame timings window, call this function along with any other imgui drawing code.
+    pub fn draw(self: *FrameTimingsWindow) void {
+        if (self.visible) {
+            imgui.ImGui_SetNextWindowPosEx(self.position, 0, imgui.ImVec2{ .x = 0, .y = 0 });
+            imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 300, .y = 160 }, 0);
+
+            _ = imgui.ImGui_Begin(
+                "Frame timings",
+                null,
+                imgui.ImGuiWindowFlags_NoFocusOnAppearing |
+                    imgui.ImGuiWindowFlags_NoMove |
+                    imgui.ImGuiWindowFlags_NoResize |
+                    imgui.ImGuiWindowFlags_NoBackground |
+                    imgui.ImGuiWindowFlags_NoTitleBar |
+                    imgui.ImGuiWindowFlags_NoMouseInputs,
+            );
+
+            imgui.ImGui_TextColored(
+                imgui.ImVec4{ .x = 0, .y = 1, .z = 0, .w = 1 },
+                "Frame timings",
+            );
+
+            const max_value: f32 = 0.016; // 60 FPS.
+            var timings_tick: [MAX_FRAME_TIME_COUNT]f32 = [1]f32{0} ** MAX_FRAME_TIME_COUNT;
+            var timings_draw: [MAX_FRAME_TIME_COUNT]f32 = [1]f32{0} ** MAX_FRAME_TIME_COUNT;
+            var timings_full: [MAX_FRAME_TIME_COUNT]f32 = [1]f32{0} ** MAX_FRAME_TIME_COUNT;
+            for (0..MAX_FRAME_TIME_COUNT) |i| {
+                const frame_times: FrameTimes = self.frame_times[@intCast(i)];
+                timings_tick[i] =
+                    (@as(f32, @floatFromInt(frame_times.tick)) - @as(f32, @floatFromInt(frame_times.start))) /
+                    @as(f32, @floatFromInt(self.performance_frequency));
+                timings_draw[i] =
+                    (@as(f32, @floatFromInt(frame_times.draw)) - @as(f32, @floatFromInt(frame_times.start))) /
+                    @as(f32, @floatFromInt(self.performance_frequency));
+                // TODO: Why does the current frame show as 0 for the full frame graph?
+                timings_full[i] =
+                    (@as(f32, @floatFromInt(frame_times.frame)) - @as(f32, @floatFromInt(frame_times.start))) /
+                    @as(f32, @floatFromInt(self.performance_frequency));
+            }
+
+            const graph_position = imgui.ImGui_GetCursorPos();
+
+            // TODO: Draw lines at common FPS boundary points.
+
+            imgui.ImGui_SetCursorPos(graph_position);
+            imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_PlotLines, .{ .x = 0.2, .y = 1, .z = 0.2, .w = 1 });
+            imgui.ImGui_PlotLinesEx(
+                "##FrameTimings_GraphTick",
+                &timings_tick,
+                timings_tick.len,
+                0,
+                "",
+                0,
+                max_value,
+                imgui.ImVec2{ .x = 300, .y = 100 },
+                @sizeOf(f32),
+            );
+            imgui.ImGui_SetCursorPos(graph_position);
+            imgui.ImGui_PopStyleColor();
+            imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_PlotLines, .{ .x = 1, .y = 1, .z = 0, .w = 1 });
+            imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_FrameBg, .{ .x = 1, .y = 1, .z = 1, .w = 0 });
+            imgui.ImGui_PlotLinesEx(
+                "##FrameTimings_GraphDraw",
+                &timings_draw,
+                timings_draw.len,
+                0,
+                "",
+                0,
+                max_value,
+                imgui.ImVec2{ .x = 300, .y = 100 },
+                @sizeOf(f32),
+            );
+            imgui.ImGui_SetCursorPos(graph_position);
+            imgui.ImGui_PopStyleColor();
+            imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_PlotLines, .{ .x = 1, .y = 0.2, .z = 0.2, .w = 1 });
+            imgui.ImGui_PlotLinesEx(
+                "##FrameTimings_GraphFull",
+                &timings_full,
+                timings_full.len,
+                0,
+                "",
+                0,
+                max_value,
+                imgui.ImVec2{ .x = 300, .y = 100 },
+                @sizeOf(f32),
+            );
+            imgui.ImGui_PopStyleColor();
+            imgui.ImGui_PopStyleColor();
+
+            imgui.ImGui_End();
+        }
+    }
+};
+
 /// This window displays a rolling average of frame times over the last 300 frames.
 pub const FPSWindow = struct {
     current_frame_index: u32,

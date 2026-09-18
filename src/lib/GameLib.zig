@@ -121,6 +121,7 @@ pub const Dependencies = struct {
         allocator: *std.mem.Allocator = undefined,
         output: *internal.DebugOutputWindow = undefined,
         fps_window: *internal.FPSWindow = undefined,
+        frame_timings_window: ?*internal.FrameTimingsWindow = null,
         memory_usage_window: *internal.MemoryUsageWindow = undefined,
     } else extern struct {};
 };
