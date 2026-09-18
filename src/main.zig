@@ -125,12 +125,18 @@ pub fn main(init: std.process.Init) !void {
                 @panic("Failed to allocate DebugOutputWindow."),
             .fps_window = internal_allocator.create(flint.internal.FPSWindow) catch
                 @panic("Failed to allocate FPSWindow."),
+            .frame_timings_window = internal_allocator.create(flint.internal.FrameTimingsWindow) catch
+                @panic("Failed to allocate FPSWindow."),
             .memory_usage_window = internal_allocator.create(flint.internal.MemoryUsageWindow) catch
                 @panic("Failed to allocate MemoryUsageWindow."),
         };
 
         internal_dependencies.output.init(&internal_allocator);
         internal_dependencies.fps_window.init(sdl.SDL_GetPerformanceFrequency());
+
+        if (internal_dependencies.frame_timings_window) |frame_timings_window| {
+            frame_timings_window.init(sdl.SDL_GetPerformanceFrequency());
+        }
 
         internal_dependencies.memory_usage_window.init();
         memory_usage_window = internal_dependencies.memory_usage_window;
@@ -206,6 +212,10 @@ pub fn main(init: std.process.Init) !void {
         frame_start_time = sdl.SDL_GetTicks();
         const delta_time = frame_start_time - previous_frame_start_time;
 
+        if (internal_dependencies.frame_timings_window) |frame_timings_window| {
+            frame_timings_window.addFrameTime(sdl.SDL_GetPerformanceCounter());
+        }
+
         if (INTERNAL) {
             const assets_changed = assetsHaveChanged(allocator, init.io);
             const code_changed = codeHasChanged(allocator, init.io);
@@ -252,7 +262,16 @@ pub fn main(init: std.process.Init) !void {
         }
 
         game.tick(state, frame_start_time, delta_time);
+        if (internal_dependencies.frame_timings_window) |frame_timings_window| {
+            frame_timings_window.setFrameTime(.tick, sdl.SDL_GetPerformanceCounter());
+        }
+
         game.draw(state);
+        // TODO: How can we capture this value when using VSync? It seems like we get the same value for this as
+        // for the end of the frame when VSync is enabled.
+        if (internal_dependencies.frame_timings_window) |frame_timings_window| {
+            frame_timings_window.setFrameTime(.draw, sdl.SDL_GetPerformanceCounter());
+        }
 
         frame_elapsed_time = sdl.SDL_GetTicks() - frame_start_time;
 
@@ -262,6 +281,9 @@ pub fn main(init: std.process.Init) !void {
             }
         }
         previous_frame_start_time = frame_start_time;
+        if (internal_dependencies.frame_timings_window) |frame_timings_window| {
+            frame_timings_window.setFrameTime(.frame, sdl.SDL_GetPerformanceCounter());
+        }
     }
 
     game.deinit(state);
