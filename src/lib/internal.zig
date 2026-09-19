@@ -37,7 +37,7 @@ pub const FrameTimingsWindow = struct {
         self.current_frame_index = 0;
         self.performance_frequency = frequency;
         self.frame_times = [1]FrameTimes{.{}} ** MAX_FRAME_TIME_COUNT;
-        self.position = imgui.ImVec2{ .x = 5, .y = 5 };
+        self.position = imgui.ImVec2{ .x = 5, .y = 10 };
     }
 
     pub fn addFrameTime(self: *FrameTimingsWindow, frame_time: u64) void {
@@ -61,26 +61,20 @@ pub const FrameTimingsWindow = struct {
     /// Display the frame timings window, call this function along with any other imgui drawing code.
     pub fn draw(self: *FrameTimingsWindow) void {
         if (self.visible) {
-            imgui.ImGui_SetNextWindowPosEx(self.position, 0, imgui.ImVec2{ .x = 0, .y = 0 });
-            imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 300, .y = 160 }, 0);
+            imgui.ImGui_SetNextWindowPos(self.position, imgui.ImGuiCond_FirstUseEver);
+            imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 300, .y = 160 }, imgui.ImGuiCond_FirstUseEver);
 
             _ = imgui.ImGui_Begin(
                 "Frame timings",
                 null,
                 imgui.ImGuiWindowFlags_NoFocusOnAppearing |
-                    imgui.ImGuiWindowFlags_NoMove |
-                    imgui.ImGuiWindowFlags_NoResize |
-                    imgui.ImGuiWindowFlags_NoBackground |
-                    imgui.ImGuiWindowFlags_NoTitleBar |
-                    imgui.ImGuiWindowFlags_NoMouseInputs,
+                    imgui.ImGuiWindowFlags_NoNavFocus |
+                    imgui.ImGuiWindowFlags_NoNavInputs |
+                    imgui.ImGuiWindowFlags_NoBackground,
             );
+            defer imgui.ImGui_End();
 
-            imgui.ImGui_TextColored(
-                imgui.ImVec4{ .x = 0, .y = 1, .z = 0, .w = 1 },
-                "Frame timings",
-            );
-
-            const max_value: f32 = 0.016; // 60 FPS.
+            const max_value: f32 = 0.032; // 30 FPS.
             var timings_tick: [MAX_FRAME_TIME_COUNT]f32 = [1]f32{0} ** MAX_FRAME_TIME_COUNT;
             var timings_draw: [MAX_FRAME_TIME_COUNT]f32 = [1]f32{0} ** MAX_FRAME_TIME_COUNT;
             var timings_full: [MAX_FRAME_TIME_COUNT]f32 = [1]f32{0} ** MAX_FRAME_TIME_COUNT;
@@ -98,57 +92,59 @@ pub const FrameTimingsWindow = struct {
                     @as(f32, @floatFromInt(self.performance_frequency));
             }
 
-            const graph_position = imgui.ImGui_GetCursorPos();
+            const window_position: imgui.ImVec2 = imgui.ImGui_GetWindowPos();
+            const region_min: imgui.ImVec2 = imgui.ImGui_GetWindowContentRegionMin();
+            const region_max: imgui.ImVec2 = imgui.ImGui_GetWindowContentRegionMax();
+            const size: imgui.ImVec2 = .{ .x = region_max.x - region_min.x, .y = region_max.y - region_min.y };
+            const position = imgui.ImGui_GetCursorPos();
 
-            // TODO: Draw lines at common FPS boundary points.
-
-            imgui.ImGui_SetCursorPos(graph_position);
-            imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_PlotLines, .{ .x = 0.2, .y = 1, .z = 0.2, .w = 1 });
-            imgui.ImGui_PlotLinesEx(
-                "##FrameTimings_GraphTick",
-                &timings_tick,
-                timings_tick.len,
-                0,
-                "",
-                0,
-                max_value,
-                imgui.ImVec2{ .x = 300, .y = 100 },
-                @sizeOf(f32),
-            );
-            imgui.ImGui_SetCursorPos(graph_position);
-            imgui.ImGui_PopStyleColor();
-            imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_PlotLines, .{ .x = 1, .y = 1, .z = 0, .w = 1 });
+            drawGraph(position, size, .{ .x = 0.2, .y = 1, .z = 0.2, .w = 1 }, timings_tick, max_value, "GraphTick");
             imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_FrameBg, .{ .x = 1, .y = 1, .z = 1, .w = 0 });
-            imgui.ImGui_PlotLinesEx(
-                "##FrameTimings_GraphDraw",
-                &timings_draw,
-                timings_draw.len,
-                0,
-                "",
-                0,
-                max_value,
-                imgui.ImVec2{ .x = 300, .y = 100 },
-                @sizeOf(f32),
-            );
-            imgui.ImGui_SetCursorPos(graph_position);
-            imgui.ImGui_PopStyleColor();
-            imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_PlotLines, .{ .x = 1, .y = 0.2, .z = 0.2, .w = 1 });
-            imgui.ImGui_PlotLinesEx(
-                "##FrameTimings_GraphFull",
-                &timings_full,
-                timings_full.len,
-                0,
-                "",
-                0,
-                max_value,
-                imgui.ImVec2{ .x = 300, .y = 100 },
-                @sizeOf(f32),
-            );
-            imgui.ImGui_PopStyleColor();
+            drawGraph(position, size, .{ .x = 1, .y = 1, .z = 0, .w = 1 }, timings_draw, max_value, "GraphDraw");
+            drawGraph(position, size, .{ .x = 1, .y = 0.2, .z = 0.2, .w = 1 }, timings_full, max_value, "GraphFull");
             imgui.ImGui_PopStyleColor();
 
-            imgui.ImGui_End();
+            var divider_position: imgui.ImVec2 = .{
+                .x = window_position.x + position.x,
+                .y = position.y + window_position.y,
+            };
+            drawLine(divider_position, size.x, "32ms");
+            divider_position.y += size.y * 0.5;
+            drawLine(divider_position, size.x, "16ms");
+            divider_position.y += size.y * 0.25;
+            drawLine(divider_position, size.x, "8ms");
         }
+    }
+
+    fn drawLine(position: imgui.ImVec2, width: f32, comptime label: [:0]const u8) void {
+        const white = imgui.ImGui_ColorConvertFloat4ToU32(.{ .x = 255, .y = 255, .z = 255, .w = 255 });
+        const draw_list: *imgui.ImDrawList = imgui.ImGui_GetForegroundDrawList();
+        draw_list.AddLineHEx(position.x, position.x + width, position.y, white, 1);
+        draw_list.AddText(.{ .x = position.x + width, .y = position.y - 6 }, white, label.ptr);
+    }
+
+    fn drawGraph(
+        position: imgui.ImVec2,
+        size: imgui.ImVec2,
+        color: imgui.ImVec4,
+        data: [MAX_FRAME_TIME_COUNT]f32,
+        max_value: f32,
+        comptime name: []const u8,
+    ) void {
+        imgui.ImGui_SetCursorPos(position);
+        imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_PlotLines, color);
+        imgui.ImGui_PlotLinesEx(
+            "##FrameTimings_" ++ name,
+            &data,
+            data.len,
+            0,
+            "",
+            0,
+            max_value,
+            size,
+            @sizeOf(f32),
+        );
+        imgui.ImGui_PopStyleColor();
     }
 };
 
