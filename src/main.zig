@@ -212,11 +212,11 @@ pub fn main(init: std.process.Init) !void {
         frame_start_time = sdl.SDL_GetTicks();
         const delta_time = frame_start_time - previous_frame_start_time;
 
-        if (internal_dependencies.frame_timings_window) |frame_timings_window| {
-            frame_timings_window.addFrameTime(sdl.SDL_GetPerformanceCounter());
-        }
-
         if (INTERNAL) {
+            if (internal_dependencies.frame_timings_window) |frame_timings_window| {
+                frame_timings_window.addFrameTime(sdl.SDL_GetPerformanceCounter());
+            }
+
             const assets_changed = assetsHaveChanged(allocator, init.io);
             const code_changed = codeHasChanged(allocator, init.io);
             const dll_changed = dllHasChanged(init.io);
@@ -262,15 +262,19 @@ pub fn main(init: std.process.Init) !void {
         }
 
         game.tick(state, frame_start_time, delta_time);
-        if (internal_dependencies.frame_timings_window) |frame_timings_window| {
-            frame_timings_window.setFrameTime(.tick, sdl.SDL_GetPerformanceCounter());
+        if (INTERNAL) {
+            if (internal_dependencies.frame_timings_window) |frame_timings_window| {
+                frame_timings_window.setFrameTime(.tick, sdl.SDL_GetPerformanceCounter());
+            }
         }
 
         game.draw(state);
         // TODO: How can we capture this value when using VSync? It seems like we get the same value for this as
         // for the end of the frame when VSync is enabled.
-        if (internal_dependencies.frame_timings_window) |frame_timings_window| {
-            frame_timings_window.setFrameTime(.draw, sdl.SDL_GetPerformanceCounter());
+        if (INTERNAL) {
+            if (internal_dependencies.frame_timings_window) |frame_timings_window| {
+                frame_timings_window.setFrameTime(.draw, sdl.SDL_GetPerformanceCounter());
+            }
         }
 
         frame_elapsed_time = sdl.SDL_GetTicks() - frame_start_time;
@@ -281,8 +285,10 @@ pub fn main(init: std.process.Init) !void {
             }
         }
         previous_frame_start_time = frame_start_time;
-        if (internal_dependencies.frame_timings_window) |frame_timings_window| {
-            frame_timings_window.setFrameTime(.frame, sdl.SDL_GetPerformanceCounter());
+        if (INTERNAL) {
+            if (internal_dependencies.frame_timings_window) |frame_timings_window| {
+                frame_timings_window.setFrameTime(.frame, sdl.SDL_GetPerformanceCounter());
+            }
         }
     }
 
