@@ -99,7 +99,6 @@
 //!         .name = flint_options.name,
 //!         .linkage = .dynamic,
 //!         .root_module = module,
-//!         .use_llvm = true,
 //!     });
 //!
 //!     return .{ .exe = result.exe, .lib = lib, .assets_path = b.path("assets") };

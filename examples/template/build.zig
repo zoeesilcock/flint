@@ -40,7 +40,6 @@ pub fn build(b: *std.Build) void {
         .name = flint_options.name,
         .linkage = .dynamic,
         .root_module = module,
-        .use_llvm = true,
     });
 
     // Install library.
