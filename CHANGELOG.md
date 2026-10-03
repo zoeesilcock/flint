@@ -20,6 +20,7 @@ The format is roughly speaking 0.MAJOR.MINOR.PATCH.
 * Added the ability to configure the frame rate by including a `GameLib.FrameRateSetting` in the `GameLib.Settings`. It allows picking between vsync (with fallback since it can fail), fixed and unconstrained.
 * Added a wrapper around `std.Io.Dir.createFile` to allow creating files relative to the location of the executable.
 ### Changed
+* [Breaking] Updated minimum Zig version to 0.17.0.
 * Updated SDL to version 3.4.16.
 * Updated umgui to version 1.92.9b.
 * The imgui.ini is now placed in the same directory as the executable, regardless of where it was launched from.
