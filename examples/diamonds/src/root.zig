@@ -1006,7 +1006,7 @@ fn addGameUI(state: *State) !void {
     var position: Vector2 = .{ 0 - life_width - life_padding[X], life_padding[Y] };
     for (0..MAX_LIVES) |i| {
         var life = try addUISprite(state, position, .{ 0.5, 0 });
-        life.ui_element = @fromBackingInt(@backingInt(UIElement.life1) + i);
+        life.ui_element = @fromBackingInt(@backingInt(UIElement.life1) + @as(u8, @intCast(i)));
         position += life_step;
     }
 }

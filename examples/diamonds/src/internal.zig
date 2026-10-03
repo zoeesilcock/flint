@@ -161,7 +161,7 @@ pub fn processInputEvent(state: *State, event: sdl.SDL_Event) void {
                 }
             },
             sdl.SDLK_E => {
-                var next_mode: u32 = @backingInt(state.internal.mode) + 1;
+                var next_mode: u8 = @backingInt(state.internal.mode) + 1;
                 if (next_mode > @typeInfo(@TypeOf(state.internal.mode)).@"enum".field_names.len - 1) {
                     next_mode = 0;
                 }

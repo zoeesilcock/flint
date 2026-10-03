@@ -475,21 +475,21 @@ pub const Collision = struct {
     other_id: EntityId,
 };
 
-pub const ColorComponentValue = enum {
+pub const ColorComponentValue = enum(u32) {
     None,
     Gray,
     Red,
     Blue,
 };
 
-pub const BlockType = enum {
+pub const BlockType = enum(u32) {
     None,
     Wall,
     Deadly,
     ColorChange,
 };
 
-pub const TitleType = enum {
+pub const TitleType = enum(u32) {
     NONE,
     PAUSED,
     GET_READY,
