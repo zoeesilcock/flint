@@ -80,7 +80,7 @@ pub const State = struct {
     pub fn getFragmentUniforms(self: *State) FragmentUniforms {
         return .{
             .time = self.currentTime(),
-            .screen_effect = @intFromEnum(self.screen_effect),
+            .screen_effect = @backingInt(self.screen_effect),
         };
     }
 };
@@ -353,12 +353,12 @@ pub export fn processInput(state_ptr: GameLib.GameStatePtr) bool {
                     }
                 },
                 sdl.SDLK_E => {
-                    var next_effect = @intFromEnum(state.screen_effect) + 1;
+                    var next_effect = @backingInt(state.screen_effect) + 1;
                     if (next_effect >= @typeInfo(ScreenEffect).@"enum".field_names.len) {
                         next_effect = 0;
                     }
 
-                    state.screen_effect = @enumFromInt(next_effect);
+                    state.screen_effect = @fromBackingInt(next_effect);
                 },
                 else => {},
             }

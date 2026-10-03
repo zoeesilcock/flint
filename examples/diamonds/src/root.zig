@@ -916,8 +916,8 @@ pub fn loadLevel(state: *State, name: []const u8) !void {
 
         _ = try addWall(
             state,
-            @enumFromInt(color),
-            @enumFromInt(block_type),
+            @fromBackingInt(color),
+            @fromBackingInt(block_type),
             Vector2{ @floatFromInt(x), @floatFromInt(y) },
         );
     }
@@ -1006,7 +1006,7 @@ fn addGameUI(state: *State) !void {
     var position: Vector2 = .{ 0 - life_width - life_padding[X], life_padding[Y] };
     for (0..MAX_LIVES) |i| {
         var life = try addUISprite(state, position, .{ 0.5, 0 });
-        life.ui_element = @enumFromInt(@intFromEnum(UIElement.life1) + i);
+        life.ui_element = @fromBackingInt(@backingInt(UIElement.life1) + i);
         position += life_step;
     }
 }

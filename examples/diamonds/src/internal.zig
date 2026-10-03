@@ -161,11 +161,11 @@ pub fn processInputEvent(state: *State, event: sdl.SDL_Event) void {
                 }
             },
             sdl.SDLK_E => {
-                var next_mode: u32 = @intFromEnum(state.internal.mode) + 1;
+                var next_mode: u32 = @backingInt(state.internal.mode) + 1;
                 if (next_mode > @typeInfo(@TypeOf(state.internal.mode)).@"enum".field_names.len - 1) {
                     next_mode = 0;
                 }
-                state.internal.mode = @enumFromInt(next_mode);
+                state.internal.mode = @fromBackingInt(next_mode);
             },
             sdl.SDLK_S => {
                 saveLevel(state, state.internal.currentLevelName()) catch unreachable;
@@ -765,8 +765,8 @@ fn saveLevel(state: *State, name: []const u8) !void {
     iter.reset();
     while (iter.next()) |entity| {
         if (entity.hasFlag(.has_block) and entity.hasFlag(.has_transform)) {
-            try writer.writeInt(u32, @intFromEnum(entity.color), .little);
-            try writer.writeInt(u32, @intFromEnum(entity.block_type), .little);
+            try writer.writeInt(u32, @backingInt(entity.color), .little);
+            try writer.writeInt(u32, @backingInt(entity.block_type), .little);
             try writer.writeInt(i32, @round(entity.position[X]), .little);
             try writer.writeInt(i32, @round(entity.position[Y]), .little);
         }
