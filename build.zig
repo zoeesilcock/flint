@@ -180,7 +180,6 @@ pub fn buildMatrix(
                     @tagName(optimize),
                     if (internal) "internal" else "release",
                 });
-                const prefix_dir: []const u8 = b.fmt("zig-out/{s}", .{dest_path});
                 const build_cmd = b.addSystemCommand(&.{
                     "zig",
                     "build",
@@ -194,9 +193,9 @@ pub fn buildMatrix(
                     "-Dinternal=" ++
                         if (internal) "true" else "false",
                     "--prefix-lib-dir",
-                    prefix_dir,
+                    dest_path,
                     "--prefix-exe-dir",
-                    prefix_dir,
+                    dest_path,
                 });
 
                 // Install game assets.
