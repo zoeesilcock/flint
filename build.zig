@@ -23,12 +23,28 @@ pub const IntegrateOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     build_options: *std.Build.Step.Options,
+    sdl_build_options: SDLBuildOptions = .{},
     internal: bool = true,
     name: []const u8 = "game",
     lib_only: bool = false,
     skip_run_step: bool = false,
     install_step: *std.Build.Step,
     dest_dir: std.Build.Step.InstallArtifact.Options.Dir = .default,
+};
+
+/// Paths needed to build SDL when the target has been specified, this is needed for the `buildMatrix` function.
+/// They are also needed when cross compiling MacOS builds from other platforms, but that isn't supported by Apple.
+/// The default values are what you would expect on a standard MacOS installation.
+pub const SDLBuildOptions = struct {
+    system_include_path: std.Build.LazyPath = .{
+        .cwd_relative = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include",
+    },
+    system_framework_path: std.Build.LazyPath = .{
+        .cwd_relative = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks",
+    },
+    library_path: std.Build.LazyPath = .{
+        .cwd_relative = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib",
+    },
 };
 
 /// This struct contains the results of the `integrate` function.
@@ -58,7 +74,8 @@ pub fn build(b: *std.Build) !void {
     b.default_step = build_all_step;
 
     // Flint module.
-    const flint_mod = addFlintModule(b, b, target, optimize, build_all_step, build_options_mod, internal, .default);
+    const flint_mod =
+        addFlintModule(b, b, target, optimize, .{}, build_all_step, build_options_mod, internal, .default);
 
     // Main executable.
     const exe = addFlintExecutable(b, target, optimize, exe_build_options_mod, flint_mod, "flint");
@@ -117,6 +134,7 @@ pub fn integrate(b: *std.Build, options: IntegrateOptions) IntegrateResult {
         b,
         options.target,
         options.optimize,
+        options.sdl_build_options,
         options.install_step,
         build_options_mod,
         options.internal,
@@ -220,6 +238,7 @@ pub fn addFlintModule(
     client_b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    sdl_build_options: SDLBuildOptions,
     install_step: *std.Build.Step,
     build_options_mod: *std.Build.Module,
     internal: bool,
@@ -236,13 +255,13 @@ pub fn addFlintModule(
         b.createModule(module_opts);
 
     flint_mod.addImport("build_options", build_options_mod);
-    if (getSDLIncludePath(b, target, optimize)) |sdl_include_path| {
+    if (getSDLIncludePath(b, target, optimize, sdl_build_options)) |sdl_include_path| {
         flint_mod.addIncludePath(sdl_include_path);
     }
     if (internal) {
-        linkImgui(b, flint_mod, target, optimize, install_step);
+        linkImgui(b, flint_mod, target, optimize, sdl_build_options, install_step);
     }
-    linkSDL(b, client_b, flint_mod, target, optimize, install_step, dest_dir);
+    linkSDL(b, client_b, flint_mod, target, optimize, sdl_build_options, install_step, dest_dir);
     return flint_mod;
 }
 
@@ -285,10 +304,11 @@ fn linkSDL(
     module: *std.Build.Module,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    sdl_build_options: SDLBuildOptions,
     install_step: *std.Build.Step,
     dest_dir: std.Build.Step.InstallArtifact.Options.Dir,
 ) void {
-    if (getSDL(b, target, optimize)) |sdl_lib| {
+    if (getSDL(b, target, optimize, sdl_build_options)) |sdl_lib| {
         const translate_c = b.dependency("translate_c", .{});
         const t: Translator = .init(translate_c, .{
             .c_source_file = b.path("src/lib/sdl.h"),
@@ -296,7 +316,7 @@ fn linkSDL(
             .optimize = optimize,
             .default_init = true,
         });
-        if (getSDLIncludePath(b, target, optimize)) |sdl_include_path| {
+        if (getSDLIncludePath(b, target, optimize, sdl_build_options)) |sdl_include_path| {
             t.addIncludePath(sdl_include_path);
         }
         module.addImport("sdl_c", t.mod);
@@ -310,12 +330,16 @@ pub fn getSDL(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    sdl_build_options: SDLBuildOptions,
 ) ?*std.Build.Step.Compile {
     var result: ?*std.Build.Step.Compile = null;
     if (b.lazyDependency("sdl", .{
         .target = target,
         .optimize = optimize,
         .preferred_linkage = .dynamic,
+        .system_include_path = sdl_build_options.system_include_path,
+        .system_framework_path = sdl_build_options.system_framework_path,
+        .library_path = sdl_build_options.library_path,
     })) |sdl_dep| {
         result = sdl_dep.artifact("SDL3");
     }
@@ -326,6 +350,7 @@ pub fn getSDLIncludePath(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    sdl_build_options: SDLBuildOptions,
 ) ?std.Build.LazyPath {
     var result: ?std.Build.LazyPath = null;
 
@@ -333,6 +358,9 @@ pub fn getSDLIncludePath(
         .target = target,
         .optimize = optimize,
         .preferred_linkage = .dynamic,
+        .system_include_path = sdl_build_options.system_include_path,
+        .system_framework_path = sdl_build_options.system_framework_path,
+        .library_path = sdl_build_options.library_path,
     })) |sdl_dep| {
         result = sdl_dep.path("include");
     }
@@ -345,13 +373,14 @@ fn linkImgui(
     module: *std.Build.Module,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    sdl_build_options: SDLBuildOptions,
     install_step: *std.Build.Step,
 ) void {
     if (b.lazyDependency("imgui", .{
         .target = target,
         .optimize = optimize,
     })) |imgui_dep| {
-        if (createImGuiModule(b, target, optimize, imgui_dep, install_step)) |imgui_mod| {
+        if (createImGuiModule(b, target, optimize, sdl_build_options, imgui_dep, install_step)) |imgui_mod| {
             module.addImport("imgui_c", imgui_mod);
         }
     }
@@ -361,6 +390,7 @@ fn createImGuiModule(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    sdl_build_options: SDLBuildOptions,
     imgui_dep: *std.Build.Dependency,
     install_step: *std.Build.Step,
 ) ?*std.Build.Module {
@@ -380,6 +410,9 @@ fn createImGuiModule(
         .target = target,
         .optimize = optimize,
         .preferred_linkage = .dynamic,
+        .system_include_path = sdl_build_options.system_include_path,
+        .system_framework_path = sdl_build_options.system_framework_path,
+        .library_path = sdl_build_options.library_path,
     })) |sdl_dep| {
         if (b.lazyDependency("dear_bindings", .{})) |dear_bindings_dep| {
             const module = b.createModule(.{
