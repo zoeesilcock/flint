@@ -128,5 +128,4 @@ pub const internal = @import("internal.zig");
 
 pub const GameLib = @import("GameLib.zig");
 
-pub const integration = @import("build/integration.zig");
-pub const BuildMatrixStep = @import("build/MatrixStep.zig");
+pub const build_integration = @import("build_integration.zig");
