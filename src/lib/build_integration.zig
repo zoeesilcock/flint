@@ -1,4 +1,6 @@
-//! These structs are used for the build integration.
+//! These structs are used for the build integration. By importing flint in your build.zig file you get access to the
+//! `integrate` function which takes a `*std.Build` and an `IntegrateOptions` struct and returns an `IntegrateResult`
+//! struct.
 const std = @import("std");
 
 /// This struct defines the options that need to be passed to the `integrate` function.
