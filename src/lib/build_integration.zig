@@ -3,6 +3,8 @@
 //! struct.
 const std = @import("std");
 
+const PLATFORM = @import("builtin").os.tag;
+
 /// This struct defines the options that need to be passed to the `integrate` function.
 pub const IntegrateOptions = struct {
     dependency: *std.Build.Dependency,
@@ -20,17 +22,17 @@ pub const IntegrateOptions = struct {
 
 /// Paths needed to build SDL when the target has been specified, this is needed for the `buildMatrix` function.
 /// They are also needed when cross compiling MacOS builds from other platforms, but that isn't supported by Apple.
-/// The default values are what you would expect on a standard MacOS installation.
+/// The default values are what you would expect on a standard MacOS installation, other platforms default to null.
 pub const SDLBuildOptions = struct {
-    system_include_path: std.Build.LazyPath = .{
+    system_include_path: ?std.Build.LazyPath = if (PLATFORM == .macos) .{
         .cwd_relative = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include",
-    },
-    system_framework_path: std.Build.LazyPath = .{
+    } else null,
+    system_framework_path: ?std.Build.LazyPath = if (PLATFORM == .macos) .{
         .cwd_relative = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks",
-    },
-    library_path: std.Build.LazyPath = .{
+    } else null,
+    library_path: ?std.Build.LazyPath = if (PLATFORM == .macos) .{
         .cwd_relative = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib",
-    },
+    } else null,
 };
 
 /// This struct contains the results of the `integrate` function.
