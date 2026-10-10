@@ -36,7 +36,7 @@ pub const FrameTimingsWindow = struct {
     pub fn init(self: *FrameTimingsWindow, frequency: u64) void {
         self.current_frame_index = 0;
         self.performance_frequency = frequency;
-        self.frame_times = [1]FrameTimes{.{}} ** MAX_FRAME_TIME_COUNT;
+        self.frame_times = @splat(.{});
         self.position = imgui.ImVec2{ .x = 5, .y = 10 };
     }
 
@@ -75,9 +75,9 @@ pub const FrameTimingsWindow = struct {
             defer imgui.ImGui_End();
 
             const max_value: f32 = 0.032; // 30 FPS.
-            var timings_tick: [MAX_FRAME_TIME_COUNT]f32 = [1]f32{0} ** MAX_FRAME_TIME_COUNT;
-            var timings_draw: [MAX_FRAME_TIME_COUNT]f32 = [1]f32{0} ** MAX_FRAME_TIME_COUNT;
-            var timings_full: [MAX_FRAME_TIME_COUNT]f32 = [1]f32{0} ** MAX_FRAME_TIME_COUNT;
+            var timings_tick: [MAX_FRAME_TIME_COUNT]f32 = @splat(0);
+            var timings_draw: [MAX_FRAME_TIME_COUNT]f32 = @splat(0);
+            var timings_full: [MAX_FRAME_TIME_COUNT]f32 = @splat(0);
             for (0..MAX_FRAME_TIME_COUNT) |i| {
                 const frame_times: FrameTimes = self.frame_times[@intCast(i)];
                 timings_tick[i] =
