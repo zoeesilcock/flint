@@ -158,7 +158,7 @@ pub const Entity = struct {
     tween_end_value: TweenedValue = .{ .f32 = 0 },
 
     pub fn addFlag(self: *Entity, flag: EntityFlags) void {
-        self.flags |= @intFromEnum(flag);
+        self.flags |= @backingInt(flag);
     }
 
     pub fn removeFlag(self: *Entity, flag: EntityFlags) void {
@@ -166,7 +166,7 @@ pub const Entity = struct {
     }
 
     pub fn hasFlag(self: *const Entity, flag: EntityFlags) bool {
-        return (self.flags & @intFromEnum(flag)) != 0;
+        return (self.flags & @backingInt(flag)) != 0;
     }
 
     pub fn startAnimation(self: *Entity, state: *State, name: []const u8, assets: *game.Assets) void {
@@ -475,21 +475,21 @@ pub const Collision = struct {
     other_id: EntityId,
 };
 
-pub const ColorComponentValue = enum {
+pub const ColorComponentValue = enum(u32) {
     None,
     Gray,
     Red,
     Blue,
 };
 
-pub const BlockType = enum {
+pub const BlockType = enum(u32) {
     None,
     Wall,
     Deadly,
     ColorChange,
 };
 
-pub const TitleType = enum {
+pub const TitleType = enum(u32) {
     NONE,
     PAUSED,
     GET_READY,

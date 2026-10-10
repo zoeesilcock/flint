@@ -459,7 +459,7 @@ fn parseChunkHeader(reader: *std.Io.Reader, allocator: std.mem.Allocator) !?*Ase
     const header: *AseChunkHeader = try allocator.create(AseChunkHeader);
 
     header.size = try reader.takeInt(u32, .little);
-    header.chunk_type = @enumFromInt(try reader.takeInt(u16, .little));
+    header.chunk_type = @fromBackingInt(try reader.takeInt(u16, .little));
 
     return header;
 }
@@ -471,7 +471,7 @@ fn parseCelChunk(reader: *std.Io.Reader, header: *AseChunkHeader, allocator: std
     chunk.x = try reader.takeInt(i16, .little);
     chunk.y = try reader.takeInt(i16, .little);
     chunk.opacity = try reader.takeInt(u8, .little);
-    chunk.cel_type = @enumFromInt(try reader.takeInt(u16, .little));
+    chunk.cel_type = @fromBackingInt(try reader.takeInt(u16, .little));
     chunk.z_index = try reader.takeInt(i16, .little);
 
     std.log.info("Cel x: {d}, y: {d}, type: {}", .{ chunk.x, chunk.y, chunk.cel_type });
@@ -526,7 +526,7 @@ fn parseTagsChunks(reader: *std.Io.Reader, allocator: std.mem.Allocator) !?[]*As
 
         chunk.from_frame = try reader.takeInt(u16, .little);
         chunk.to_frame = try reader.takeInt(u16, .little);
-        chunk.loop_direction = @enumFromInt(try reader.takeInt(u8, .little));
+        chunk.loop_direction = @fromBackingInt(try reader.takeInt(u8, .little));
         chunk.repeat_count = try reader.takeInt(u16, .little);
 
         reader.toss(6 + 3 + 1);

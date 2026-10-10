@@ -43,7 +43,6 @@ pub const DebugAllocator = std.heap.DebugAllocator(.{
 });
 
 const INTERNAL: bool = @import("build_options").internal;
-const LOG_ALLOCATIONS: bool = @import("build_options").log_allocations;
 const MAX_ENTITY_COUNT = entities.MAX_ENTITY_COUNT;
 pub const WINDOW_WIDTH: u32 = if (INTERNAL) 800 else 1600;
 pub const WINDOW_HEIGHT: u32 = if (INTERNAL) 600 else 1200;
@@ -129,7 +128,7 @@ pub const State = struct {
             .level_index = 0,
             .lives_remaining = MAX_LIVES,
 
-            .entities = [1]Entity{.{}} ** MAX_ENTITY_COUNT,
+            .entities = @splat(.{}),
             .next_free_entity_index = 0,
 
             .ball_id = null,
@@ -637,9 +636,9 @@ pub export fn tick(state_ptr: GameLib.GameStatePtr, time: u64, delta_time_int: u
 
                 const type_info = @typeInfo(Entity);
                 if (state.getEntity(entity.tween_target)) |target| {
-                    inline for (type_info.@"struct".fields) |entity_field_info| {
-                        if (std.mem.eql(u8, entity_field_info.name, entity.tween_target_field)) {
-                            const current_value = &@field(target, entity_field_info.name);
+                    inline for (type_info.@"struct".field_names) |entity_field_name| {
+                        if (std.mem.eql(u8, entity_field_name, entity.tween_target_field)) {
+                            const current_value = &@field(target, entity_field_name);
                             switch (@TypeOf(current_value)) {
                                 *f32 => {
                                     current_value.* = math.lerp(entity.tween_start_value.f32, entity.tween_end_value.f32, t);
@@ -917,8 +916,8 @@ pub fn loadLevel(state: *State, name: []const u8) !void {
 
         _ = try addWall(
             state,
-            @enumFromInt(color),
-            @enumFromInt(block_type),
+            @fromBackingInt(color),
+            @fromBackingInt(block_type),
             Vector2{ @floatFromInt(x), @floatFromInt(y) },
         );
     }
@@ -1007,7 +1006,7 @@ fn addGameUI(state: *State) !void {
     var position: Vector2 = .{ 0 - life_width - life_padding[X], life_padding[Y] };
     for (0..MAX_LIVES) |i| {
         var life = try addUISprite(state, position, .{ 0.5, 0 });
-        life.ui_element = @enumFromInt(@intFromEnum(UIElement.life1) + i);
+        life.ui_element = @fromBackingInt(@backingInt(UIElement.life1) + @as(u8, @intCast(i)));
         position += life_step;
     }
 }

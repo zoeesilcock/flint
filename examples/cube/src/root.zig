@@ -80,7 +80,7 @@ pub const State = struct {
     pub fn getFragmentUniforms(self: *State) FragmentUniforms {
         return .{
             .time = self.currentTime(),
-            .screen_effect = @intFromEnum(self.screen_effect),
+            .screen_effect = @backingInt(self.screen_effect),
         };
     }
 };
@@ -353,12 +353,12 @@ pub export fn processInput(state_ptr: GameLib.GameStatePtr) bool {
                     }
                 },
                 sdl.SDLK_E => {
-                    var next_effect = @intFromEnum(state.screen_effect) + 1;
-                    if (next_effect >= @typeInfo(ScreenEffect).@"enum".fields.len) {
+                    var next_effect = @backingInt(state.screen_effect) + 1;
+                    if (next_effect >= @typeInfo(ScreenEffect).@"enum".field_names.len) {
                         next_effect = 0;
                     }
 
-                    state.screen_effect = @enumFromInt(next_effect);
+                    state.screen_effect = @fromBackingInt(next_effect);
                 },
                 else => {},
             }
@@ -864,7 +864,7 @@ fn loadShader(
     }
 
     var buf: [128]u8 = undefined;
-    const path: []u8 = std.fmt.bufPrintZ(&buf, "assets/shaders/{s}{s}", .{ name, extension }) catch "";
+    const path: []u8 = std.fmt.bufPrintSentinel(&buf, "assets/shaders/{s}{s}", .{ name, extension }, 0) catch "";
     const relative_path = flint.fs.getFilePathRelative(state.dependencies.io.*, path, state.allocator) catch "";
     var code_size: usize = 0;
     if (sdl.SDL_LoadFile(relative_path.ptr, &code_size)) |code| {
@@ -888,7 +888,7 @@ fn loadShader(
 }
 
 fn inputCustomTypes(
-    struct_field: std.builtin.Type.StructField,
+    struct_field_name: [:0]const u8,
     field_ptr: anytype,
 ) bool {
     var handled: bool = true;
@@ -898,13 +898,13 @@ fn inputCustomTypes(
             imgui.c.ImGui_PushIDPtr(field_ptr);
             defer imgui.c.ImGui_PopID();
 
-            _ = imgui.c.ImGui_InputFloat2Ex(struct_field.name, @ptrCast(field_ptr), "%.2f", 0);
+            _ = imgui.c.ImGui_InputFloat2Ex(struct_field_name, @ptrCast(field_ptr), "%.2f", 0);
         },
         Vector3 => {
             imgui.c.ImGui_PushIDPtr(field_ptr);
             defer imgui.c.ImGui_PopID();
 
-            _ = imgui.c.ImGui_InputFloat3Ex(struct_field.name, @ptrCast(field_ptr), "%.2f", 0);
+            _ = imgui.c.ImGui_InputFloat3Ex(struct_field_name, @ptrCast(field_ptr), "%.2f", 0);
         },
         else => handled = false,
     }

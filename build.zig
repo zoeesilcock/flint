@@ -1,13 +1,10 @@
 const std = @import("std");
-const integration = @import("src/lib/build/integration.zig");
-const MatrixStep = @import("src/lib/build/MatrixStep.zig");
+const Translator = @import("translate_c").Translator;
+const integration = @import("src/lib/build_integration.zig");
 
-// Types.
 pub const IntegrateOptions = integration.IntegrateOptions;
+pub const SDLBuildOptions = integration.SDLBuildOptions;
 pub const IntegrateResult = integration.IntegrateResult;
-pub const BuildMatrixStep = MatrixStep;
-pub const BuildGameFnType = MatrixStep.BuildGameFnType;
-pub const BuildResult = MatrixStep.BuildResult;
 
 const EXAMPLE_PATHS = [_][]const u8{
     "examples/template",
@@ -16,6 +13,13 @@ const EXAMPLE_PATHS = [_][]const u8{
 };
 const PLATFORM = @import("builtin").os.tag;
 const PLATFORM_CPU = @import("builtin").target.cpu;
+const DEFAULT_TARGETS = [_]std.Target.Query{
+    .{ .cpu_arch = .x86_64, .os_tag = .windows, .abi = .gnu },
+    .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .gnu },
+    .{ .cpu_arch = .aarch64, .os_tag = .macos },
+};
+const DEFAULT_OPTIMIZE_MODES = [_]std.builtin.OptimizeMode{ .Debug, .ReleaseFast };
+const DEFAULT_INTERNAL_MODES = [_]bool{ true, false };
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
@@ -37,7 +41,8 @@ pub fn build(b: *std.Build) !void {
     b.default_step = build_all_step;
 
     // Flint module.
-    const flint_mod = addFlintModule(b, b, target, optimize, build_all_step, build_options_mod, internal, .default);
+    const flint_mod =
+        addFlintModule(b, b, target, optimize, .{}, build_all_step, build_options_mod, internal, .default);
 
     // Main executable.
     const exe = addFlintExecutable(b, target, optimize, exe_build_options_mod, flint_mod, "flint");
@@ -46,24 +51,19 @@ pub fn build(b: *std.Build) !void {
     // Tests.
     const test_step = b.step("test", "Run unit tests");
 
-    const exe_tests = b.addTest(.{ .root_module = exe.root_module, .use_llvm = true });
+    const exe_tests = b.addTest(.{ .root_module = exe.root_module });
     const run_exe_tests = b.addRunArtifact(exe_tests);
     test_step.dependOn(&run_exe_tests.step);
 
-    const lib_tests = b.addTest(.{ .root_module = flint_mod, .use_llvm = true });
+    const lib_tests = b.addTest(.{ .root_module = flint_mod });
     const run_lib_tests = b.addRunArtifact(lib_tests);
     test_step.dependOn(&run_lib_tests.step);
 
     // Build all examples.
     const build_examples_step = b.step("examples", "Builds all permutations of the examples for testing purposes.");
     for (EXAMPLE_PATHS) |example_path| {
-        const build_example_cmd = b.addSystemCommand(&.{
-            "zig",
-            "build",
-            "all",
-            "--build-file",
-            b.fmt("{s}/build.zig", .{example_path}),
-        });
+        const build_example_cmd = b.addSystemCommand(&.{ "zig", "build", "all" });
+        build_example_cmd.setCwd(.{ .cwd_relative = b.fmt("{f}/{s}", .{ b.root, example_path }) });
         build_examples_step.dependOn(&build_example_cmd.step);
     }
 
@@ -101,6 +101,7 @@ pub fn integrate(b: *std.Build, options: IntegrateOptions) IntegrateResult {
         b,
         options.target,
         options.optimize,
+        options.sdl_build_options,
         options.install_step,
         build_options_mod,
         options.internal,
@@ -122,9 +123,7 @@ pub fn integrate(b: *std.Build, options: IntegrateOptions) IntegrateResult {
             const run_step = b.step("run", "Run the game");
             const run_cmd = b.addRunArtifact(exe.?);
             run_cmd.step.dependOn(b.getInstallStep());
-            if (b.args) |args| {
-                run_cmd.addArgs(args);
-            }
+            run_cmd.addPassthruArgs();
             run_step.dependOn(&run_cmd.step);
         }
     }
@@ -136,29 +135,100 @@ pub fn integrate(b: *std.Build, options: IntegrateOptions) IntegrateResult {
     };
 }
 
+pub fn buildMatrixDefault(
+    b: *std.Build,
+    step: *std.Build.Step,
+    name: []const u8,
+    opt_assets_path: ?std.Build.LazyPath,
+) void {
+    buildMatrix(b, step, name, opt_assets_path, &DEFAULT_TARGETS, &DEFAULT_OPTIMIZE_MODES, &DEFAULT_INTERNAL_MODES);
+}
+
+pub fn buildMatrix(
+    b: *std.Build,
+    step: *std.Build.Step,
+    name: []const u8,
+    opt_assets_path: ?std.Build.LazyPath,
+    comptime targets: []const std.Target.Query,
+    comptime optimize_modes: []const std.builtin.OptimizeMode,
+    comptime internal_modes: []const bool,
+) void {
+    inline for (targets) |target_query| {
+        // Skip MacOS when on a different platform.
+        if (target_query.os_tag == .macos and target_query.os_tag != PLATFORM) {
+            continue;
+        }
+        inline for (optimize_modes) |optimize| {
+            inline for (internal_modes) |internal| {
+                const dest_path: []const u8 = b.fmt("builds/{s}-{s}-{s}-{s}-{s}", .{
+                    name,
+                    @tagName(target_query.os_tag.?),
+                    @tagName(target_query.cpu_arch.?),
+                    @tagName(optimize),
+                    if (internal) "internal" else "release",
+                });
+                const build_cmd = b.addSystemCommand(&.{
+                    "zig",
+                    "build",
+                    "-Dtarget=" ++
+                        @tagName(target_query.cpu_arch.?) ++
+                        "-" ++
+                        @tagName(target_query.os_tag.?) ++
+                        if (target_query.abi) |abi| "-" ++ @tagName(abi) else "",
+                    "-Doptimize=" ++
+                        @tagName(optimize),
+                    "-Dinternal=" ++
+                        if (internal) "true" else "false",
+                    "--prefix-lib-dir",
+                    dest_path,
+                    "--prefix-exe-dir",
+                    dest_path,
+                });
+
+                // Install game assets.
+                if (opt_assets_path) |assets_path| {
+                    step.dependOn(&b.addInstallDirectory(.{
+                        .source_dir = assets_path,
+                        .install_dir = .{ .custom = dest_path },
+                        .install_subdir = b.fmt("{f}", .{assets_path}),
+                    }).step);
+                }
+
+                step.dependOn(&build_cmd.step);
+            }
+        }
+    }
+}
+
 pub fn addFlintModule(
     b: *std.Build,
     client_b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    sdl_build_options: SDLBuildOptions,
     install_step: *std.Build.Step,
     build_options_mod: *std.Build.Module,
     internal: bool,
     dest_dir: std.Build.Step.InstallArtifact.Options.Dir,
 ) *std.Build.Module {
-    const flint_mod = b.addModule("flint", .{
+    const module_opts: std.Build.Module.CreateOptions = .{
         .root_source_file = b.path("src/lib/flint.zig"),
         .target = target,
         .optimize = optimize,
-    });
+    };
+    const flint_mod = if (b == client_b)
+        b.addModule("flint", module_opts)
+    else
+        b.createModule(module_opts);
+
     flint_mod.addImport("build_options", build_options_mod);
-    if (getSDLIncludePath(b, target, optimize)) |sdl_include_path| {
+    if (getSDLIncludePath(b, target, optimize, sdl_build_options)) |sdl_include_path| {
         flint_mod.addIncludePath(sdl_include_path);
     }
     if (internal) {
-        linkImgui(b, flint_mod, target, optimize, install_step);
+        linkImgui(b, flint_mod, target, optimize, sdl_build_options, install_step);
     }
-    linkSDL(b, client_b, flint_mod, target, optimize, install_step, dest_dir);
+    linkSDL(b, client_b, flint_mod, target, optimize, sdl_build_options, install_step, dest_dir);
     return flint_mod;
 }
 
@@ -182,7 +252,6 @@ pub fn addFlintExecutable(
     const exe = b.addExecutable(.{
         .name = name,
         .root_module = module,
-        .use_llvm = true,
     });
 
     if (target.result.os.tag.isDarwin()) {
@@ -202,19 +271,22 @@ fn linkSDL(
     module: *std.Build.Module,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    sdl_build_options: SDLBuildOptions,
     install_step: *std.Build.Step,
     dest_dir: std.Build.Step.InstallArtifact.Options.Dir,
 ) void {
-    if (getSDL(b, target, optimize)) |sdl_lib| {
-        const translate_c = b.addTranslateC(.{
-            .root_source_file = b.path("src/lib/sdl.h"),
+    if (getSDL(b, target, optimize, sdl_build_options)) |sdl_lib| {
+        const translate_c = b.dependency("translate_c", .{});
+        const t: Translator = .init(translate_c, .{
+            .c_source_file = b.path("src/lib/sdl.h"),
             .target = target,
             .optimize = optimize,
+            .default_init = true,
         });
-        if (getSDLIncludePath(b, target, optimize)) |sdl_include_path| {
-            translate_c.addIncludePath(sdl_include_path);
+        if (getSDLIncludePath(b, target, optimize, sdl_build_options)) |sdl_include_path| {
+            t.addIncludePath(sdl_include_path);
         }
-        module.addImport("sdl_c", translate_c.createModule());
+        module.addImport("sdl_c", t.mod);
 
         module.linkLibrary(sdl_lib);
         install_step.dependOn(&client_b.addInstallArtifact(sdl_lib, .{ .dest_dir = dest_dir }).step);
@@ -225,12 +297,16 @@ pub fn getSDL(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    sdl_build_options: SDLBuildOptions,
 ) ?*std.Build.Step.Compile {
     var result: ?*std.Build.Step.Compile = null;
     if (b.lazyDependency("sdl", .{
         .target = target,
         .optimize = optimize,
         .preferred_linkage = .dynamic,
+        .system_include_path = sdl_build_options.system_include_path,
+        .system_framework_path = sdl_build_options.system_framework_path,
+        .library_path = sdl_build_options.library_path,
     })) |sdl_dep| {
         result = sdl_dep.artifact("SDL3");
     }
@@ -241,6 +317,7 @@ pub fn getSDLIncludePath(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    sdl_build_options: SDLBuildOptions,
 ) ?std.Build.LazyPath {
     var result: ?std.Build.LazyPath = null;
 
@@ -248,6 +325,9 @@ pub fn getSDLIncludePath(
         .target = target,
         .optimize = optimize,
         .preferred_linkage = .dynamic,
+        .system_include_path = sdl_build_options.system_include_path,
+        .system_framework_path = sdl_build_options.system_framework_path,
+        .library_path = sdl_build_options.library_path,
     })) |sdl_dep| {
         result = sdl_dep.path("include");
     }
@@ -260,13 +340,14 @@ fn linkImgui(
     module: *std.Build.Module,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    sdl_build_options: SDLBuildOptions,
     install_step: *std.Build.Step,
 ) void {
     if (b.lazyDependency("imgui", .{
         .target = target,
         .optimize = optimize,
     })) |imgui_dep| {
-        if (createImGuiModule(b, target, optimize, imgui_dep, install_step)) |imgui_mod| {
+        if (createImGuiModule(b, target, optimize, sdl_build_options, imgui_dep, install_step)) |imgui_mod| {
             module.addImport("imgui_c", imgui_mod);
         }
     }
@@ -276,6 +357,7 @@ fn createImGuiModule(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    sdl_build_options: SDLBuildOptions,
     imgui_dep: *std.Build.Dependency,
     install_step: *std.Build.Step,
 ) ?*std.Build.Module {
@@ -295,6 +377,9 @@ fn createImGuiModule(
         .target = target,
         .optimize = optimize,
         .preferred_linkage = .dynamic,
+        .system_include_path = sdl_build_options.system_include_path,
+        .system_framework_path = sdl_build_options.system_framework_path,
+        .library_path = sdl_build_options.library_path,
     })) |sdl_dep| {
         if (b.lazyDependency("dear_bindings", .{})) |dear_bindings_dep| {
             const module = b.createModule(.{
@@ -343,15 +428,16 @@ fn createImGuiModule(
 
             install_step.dependOn(&b.addInstallArtifact(dcimgui_sdl, .{}).step);
 
-            const translate_c = b.addTranslateC(.{
-                .root_source_file = b.path("src/lib/imgui.h"),
+            const translate_c = b.dependency("translate_c", .{});
+            const t: Translator = .init(translate_c, .{
+                .c_source_file = b.path("src/lib/imgui.h"),
                 .target = target,
                 .optimize = optimize,
             });
-            translate_c.addIncludePath(dear_bindings_dep.path(""));
-            translate_c.addIncludePath(imgui_dep.path("."));
+            t.addIncludePath(dear_bindings_dep.path(""));
+            t.addIncludePath(imgui_dep.path("."));
 
-            imgui_mod = translate_c.createModule();
+            imgui_mod = t.mod;
             imgui_mod.?.linkLibrary(dcimgui_sdl);
         }
     }
@@ -364,15 +450,10 @@ fn buildNewExecutable(
     build_options_mod: *std.Build.Module,
     target: std.Build.ResolvedTarget,
 ) void {
-    const new_optimize = b.option(
-        std.builtin.OptimizeMode,
-        "new_optimize",
-        "optimization mode for the new project generator (default: ReleaseSafe)",
-    ) orelse .ReleaseSafe;
     const module = b.createModule(.{
         .root_source_file = b.path("src/new.zig"),
         .target = target,
-        .optimize = new_optimize,
+        .optimize = .safe,
     });
     module.addImport("build_options", build_options_mod);
     const new_exe = b.addExecutable(.{
@@ -383,9 +464,7 @@ fn buildNewExecutable(
     const run_step = b.step("new", "Run the new project generator");
     const run_cmd = b.addRunArtifact(new_exe);
     run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
+    run_cmd.addPassthruArgs();
     run_step.dependOn(&run_cmd.step);
     run_step.dependOn(&b.addInstallArtifact(new_exe, .{}).step);
 }

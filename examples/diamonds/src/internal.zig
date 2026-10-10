@@ -88,7 +88,7 @@ pub const InternalState = struct {
             .output = dependencies.internal.output,
         };
 
-        _ = try std.fmt.bufPrintZ(&state.current_level_name, "level1", .{});
+        _ = try std.fmt.bufPrintSentinel(&state.current_level_name, "level1", .{}, 0);
 
         return state;
     }
@@ -161,11 +161,11 @@ pub fn processInputEvent(state: *State, event: sdl.SDL_Event) void {
                 }
             },
             sdl.SDLK_E => {
-                var next_mode: u32 = @intFromEnum(state.internal.mode) + 1;
-                if (next_mode > @typeInfo(@TypeOf(state.internal.mode)).@"enum".fields.len - 1) {
+                var next_mode: u8 = @backingInt(state.internal.mode) + 1;
+                if (next_mode > @typeInfo(@TypeOf(state.internal.mode)).@"enum".field_names.len - 1) {
                     next_mode = 0;
                 }
-                state.internal.mode = @enumFromInt(next_mode);
+                state.internal.mode = @fromBackingInt(next_mode);
             },
             sdl.SDLK_S => {
                 saveLevel(state, state.internal.currentLevelName()) catch unreachable;
@@ -484,7 +484,7 @@ pub fn drawDebugUI(state: *State) void {
 }
 
 fn inputCustomTypes(
-    struct_field: std.builtin.Type.StructField,
+    struct_field_name: [:0]const u8,
     field_ptr: anytype,
 ) bool {
     var handled: bool = true;
@@ -494,14 +494,14 @@ fn inputCustomTypes(
             imgui.c.ImGui_PushIDPtr(field_ptr);
             defer imgui.c.ImGui_PopID();
 
-            _ = imgui.c.ImGui_InputFloat2Ex(struct_field.name, @ptrCast(field_ptr), "%.2f", 0);
+            _ = imgui.c.ImGui_InputFloat2Ex(struct_field_name, @ptrCast(field_ptr), "%.2f", 0);
         },
         Color => {
             imgui.c.ImGui_PushIDPtr(field_ptr);
             defer imgui.c.ImGui_PopID();
 
             _ = imgui.c.ImGui_InputScalarNEx(
-                struct_field.name,
+                struct_field_name,
                 imgui.c.ImGuiDataType_U8,
                 @ptrCast(field_ptr),
                 4,
@@ -514,16 +514,17 @@ fn inputCustomTypes(
         EntityId => {
             const entity_id: *EntityId = @ptrCast(field_ptr);
             var buf: [64]u8 = undefined;
-            const id = std.fmt.bufPrintZ(
+            const id = std.fmt.bufPrintSentinel(
                 &buf,
                 "{d} ({d})",
                 .{ entity_id.index, entity_id.generation },
+                0,
             ) catch "";
             imgui.c.ImGui_LabelText("EntityId", id);
         },
         EntityFlagsType => {
-            if (std.mem.eql(u8, struct_field.name, "flags")) {
-                flint.internal.inputFlagsU32(struct_field.name, field_ptr, EntityFlags);
+            if (std.mem.eql(u8, struct_field_name, "flags")) {
+                flint.internal.inputFlagsU32(struct_field_name, field_ptr, EntityFlags);
                 handled = true;
             } else {
                 handled = false;
@@ -764,8 +765,8 @@ fn saveLevel(state: *State, name: []const u8) !void {
     iter.reset();
     while (iter.next()) |entity| {
         if (entity.hasFlag(.has_block) and entity.hasFlag(.has_transform)) {
-            try writer.writeInt(u32, @intFromEnum(entity.color), .little);
-            try writer.writeInt(u32, @intFromEnum(entity.block_type), .little);
+            try writer.writeInt(u32, @backingInt(entity.color), .little);
+            try writer.writeInt(u32, @backingInt(entity.block_type), .little);
             try writer.writeInt(i32, @round(entity.position[X]), .little);
             try writer.writeInt(i32, @round(entity.position[Y]), .little);
         }
