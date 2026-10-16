@@ -17,7 +17,15 @@ pub fn loadLibrary(path: []const u8, allocator: std.mem.Allocator) !?LoadedLibra
 
         result = windows.LoadLibraryExW(path_w, null, 0);
     } else {
-        result = try std.DynLib.open(path);
+        result = std.DynLib.open(path) catch |err| {
+            if (std.mem.span(std.c.dlerror())) |dl_err| {
+                std.log.err("Failed to load dynamic library from path {s},\nreason: {s}", .{ path, dl_err });
+                return error.LibraryLoadFailed;
+            } else {
+                std.log.err("Failed to load dynamic library from path {s},\nreason: {}", .{ path, err });
+                return err;
+            }
+        };
     }
     return result;
 }
