@@ -38,3 +38,22 @@ pub fn unloadLibrary(library: *LoadedLibrary) void {
         library.close();
     }
 }
+
+/// A wrapper which uses kernel32 on Windows and the standard library on other platforms.
+pub fn lookupLibraryFunction(
+    library: *LoadedLibrary,
+    comptime name: [:0]const u8,
+    comptime T: type,
+) ?T {
+    var result: ?T = null;
+    if (PLATFORM == .windows) {
+        if (windows.GetProcAddress(library.*, name)) |function| {
+            result = @ptrCast(function);
+        }
+    } else {
+        if (library.lookup(T, name)) |function| {
+            result = function;
+        }
+    }
+    return result;
+}
