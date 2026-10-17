@@ -32,7 +32,6 @@ const G = math.G;
 const B = math.B;
 const A = math.A;
 
-const PLATFORM = @import("builtin").os.tag;
 const DOUBLE_CLICK_THRESHOLD: u64 = 300;
 const MAX_MEMORY_USAGE_COUNT: u32 = 1000;
 const MEMORY_USAGE_RECORD_INTERVAL: u64 = 16;

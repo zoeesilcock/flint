@@ -17,7 +17,6 @@ const internal = if (INTERNAL) @import("internal.zig") else struct {
 
 // Build options.
 const INTERNAL: bool = @import("build_options").internal;
-const PLATFORM = @import("builtin").os.tag;
 
 // Types.
 pub const DebugAllocator = std.heap.DebugAllocator(.{
@@ -233,18 +232,11 @@ fn lookupFunction(
     comptime T: type,
 ) !bool {
     var fn_found: bool = false;
-    const fn_ptr = &@field(self, name);
 
-    if (PLATFORM == .windows) {
-        if (os.windows.GetProcAddress(dyn_lib.*, name)) |function| {
-            fn_ptr.* = @ptrCast(function);
-            fn_found = true;
-        }
-    } else {
-        if (dyn_lib.lookup(T, name)) |function| {
-            fn_ptr.* = function;
-            fn_found = true;
-        }
+    if (os.lookupLibraryFunction(dyn_lib, name, T)) |function| {
+        const fn_ptr = &@field(self, name);
+        fn_ptr.* = @ptrCast(function);
+        fn_found = true;
     }
 
     return fn_found;

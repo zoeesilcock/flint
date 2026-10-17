@@ -19,6 +19,7 @@ The format is roughly speaking 0.MAJOR.MINOR.PATCH.
 * Added access to internal Imgui functions via `imgui.internal`. Use these functions sparingly as the API may change in future versions of Imgui.
 * Added the ability to configure the frame rate by including a `GameLib.FrameRateSetting` in the `GameLib.Settings`. It allows picking between vsync (with fallback since it can fail), fixed and unconstrained.
 * Added a wrapper around `std.Io.Dir.createFile` to allow creating files relative to the location of the executable.
+* Added error handling to the loading of the game library so that we surface errors like undefined symbol that previously were reported as FileNotFound.
 ### Changed
 * [Breaking] Updated minimum Zig version to 0.17.0.
 * Updated SDL to version 3.4.16.

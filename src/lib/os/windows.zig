@@ -23,3 +23,5 @@ pub extern "kernel32" fn GetProcAddress(
 pub extern "kernel32" fn FreeLibrary(
     hModule: HMODULE,
 ) callconv(.winapi) BOOL;
+
+pub extern "kernel32" fn GetLastError() callconv(.winapi) DWORD;
