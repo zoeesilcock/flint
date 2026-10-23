@@ -93,9 +93,7 @@ pub const FrameTimingsWindow = struct {
             }
 
             const window_position: imgui.ImVec2 = imgui.ImGui_GetWindowPos();
-            const region_min: imgui.ImVec2 = imgui.ImGui_GetWindowContentRegionMin();
-            const region_max: imgui.ImVec2 = imgui.ImGui_GetWindowContentRegionMax();
-            const size: imgui.ImVec2 = .{ .x = region_max.x - region_min.x, .y = region_max.y - region_min.y };
+            const size: imgui.ImVec2 = imgui.ImGui_GetContentRegionAvail();
             const position = imgui.ImGui_GetCursorPos();
 
             drawGraph(position, size, .{ .x = 0.2, .y = 1, .z = 0.2, .w = 1 }, timings_tick, max_value, "GraphTick");
