@@ -29,3 +29,6 @@ zig build run
 # Build an optimized, release build of the game.
 zig build -Doptimize=ReleaseFast -Dinternal=false
 ```
+
+### Shader compilation
+This project depends on [SDL_shadercross](https://github.com/libsdl-org/SDL_shadercross) to compile the shaders for all platforms.

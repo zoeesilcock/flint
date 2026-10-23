@@ -110,5 +110,9 @@ pub fn build(b: *std.Build) !void {
         }
     }
 
-    b.getInstallStep().dependOn(compile_shaders_step);
+    if (b.findProgram(.{ .names = &[_][]const u8{"shadercross"} }) != null) {
+        b.getInstallStep().dependOn(compile_shaders_step);
+    } else {
+        std.log.warn("SDL_shadercross was not found on the path so shaders were not compiled.", .{});
+    }
 }
