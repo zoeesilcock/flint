@@ -23,14 +23,14 @@ pub const FrameTimingsWindow = struct {
         start,
         tick,
         draw,
-        frame,
+        end,
     };
 
     const FrameTimes = struct {
         start: u64 = 0,
         tick: u64 = 0,
         draw: u64 = 0,
-        frame: u64 = 0,
+        end: u64 = 0,
     };
 
     pub fn init(self: *FrameTimingsWindow, frequency: u64) void {
@@ -54,7 +54,7 @@ pub const FrameTimingsWindow = struct {
             .start => self.frame_times[self.current_frame_index].start = frame_time,
             .tick => self.frame_times[self.current_frame_index].tick = frame_time,
             .draw => self.frame_times[self.current_frame_index].draw = frame_time,
-            .frame => self.frame_times[self.current_frame_index].frame = frame_time,
+            .end => self.frame_times[self.current_frame_index].end = frame_time,
         }
     }
 
@@ -88,7 +88,7 @@ pub const FrameTimingsWindow = struct {
                     @as(f32, @floatFromInt(self.performance_frequency));
                 // TODO: Why does the current frame show as 0 for the full frame graph?
                 timings_full[i] =
-                    (@as(f32, @floatFromInt(frame_times.frame)) - @as(f32, @floatFromInt(frame_times.start))) /
+                    (@as(f32, @floatFromInt(frame_times.end)) - @as(f32, @floatFromInt(frame_times.start))) /
                     @as(f32, @floatFromInt(self.performance_frequency));
             }
 

@@ -287,7 +287,7 @@ pub fn main(init: std.process.Init) !void {
         previous_frame_start_time = frame_start_time;
         if (INTERNAL) {
             if (internal_dependencies.frame_timings_window) |frame_timings_window| {
-                frame_timings_window.setFrameTime(.frame, sdl.SDL_GetPerformanceCounter());
+                frame_timings_window.setFrameTime(.end, sdl.SDL_GetPerformanceCounter());
             }
         }
     }
