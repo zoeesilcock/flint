@@ -278,13 +278,13 @@ pub fn main(init: std.process.Init) !void {
         }
 
         frame_elapsed_time = sdl.SDL_GetTicks() - frame_start_time;
-
         if (game_settings.frame_rate.type == .fixed) {
             if (frame_elapsed_time < target_frame_time) {
                 sdl.SDL_Delay(@intCast(target_frame_time - frame_elapsed_time));
             }
         }
         previous_frame_start_time = frame_start_time;
+
         if (INTERNAL) {
             if (internal_dependencies.frame_timings_window) |frame_timings_window| {
                 frame_timings_window.setFrameTime(.end, sdl.SDL_GetPerformanceCounter());

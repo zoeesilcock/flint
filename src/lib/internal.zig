@@ -9,7 +9,7 @@ const imgui = @import("imgui.zig").c;
 
 const DebugAllocator = @import("GameLib.zig").DebugAllocator;
 
-// Displays a graph of the frame timings for the last 300 frames.
+/// Displays a graph of the frame timings for the last 300 frames.
 pub const FrameTimingsWindow = struct {
     current_frame_index: u32,
     performance_frequency: u64,
@@ -17,7 +17,7 @@ pub const FrameTimingsWindow = struct {
     position: imgui.ImVec2,
     visible: bool,
 
-    const MAX_FRAME_TIME_COUNT: u32 = 300;
+    const MAX_FRAME_TIME_COUNT: u32 = 256;
 
     const FrameTimeType = enum(u32) {
         start,
@@ -41,11 +41,7 @@ pub const FrameTimingsWindow = struct {
     }
 
     pub fn addFrameTime(self: *FrameTimingsWindow, frame_time: u64) void {
-        self.current_frame_index += 1;
-        if (self.current_frame_index >= MAX_FRAME_TIME_COUNT) {
-            self.current_frame_index = 0;
-        }
-
+        self.current_frame_index = @mod(self.current_frame_index + 1, MAX_FRAME_TIME_COUNT);
         self.setFrameTime(.start, frame_time);
     }
 
@@ -75,21 +71,25 @@ pub const FrameTimingsWindow = struct {
             defer imgui.ImGui_End();
 
             const max_value: f32 = 0.032; // 30 FPS.
+            const performance_frequency: f32 = @floatFromInt(self.performance_frequency);
+
             var timings_tick: [MAX_FRAME_TIME_COUNT]f32 = @splat(0);
             var timings_draw: [MAX_FRAME_TIME_COUNT]f32 = @splat(0);
             var timings_full: [MAX_FRAME_TIME_COUNT]f32 = @splat(0);
-            for (0..MAX_FRAME_TIME_COUNT) |i| {
-                const frame_times: FrameTimes = self.frame_times[@intCast(i)];
-                timings_tick[i] =
-                    (@as(f32, @floatFromInt(frame_times.tick)) - @as(f32, @floatFromInt(frame_times.start))) /
-                    @as(f32, @floatFromInt(self.performance_frequency));
-                timings_draw[i] =
-                    (@as(f32, @floatFromInt(frame_times.draw)) - @as(f32, @floatFromInt(frame_times.start))) /
-                    @as(f32, @floatFromInt(self.performance_frequency));
-                // TODO: Why does the current frame show as 0 for the full frame graph?
-                timings_full[i] =
-                    (@as(f32, @floatFromInt(frame_times.end)) - @as(f32, @floatFromInt(frame_times.start))) /
-                    @as(f32, @floatFromInt(self.performance_frequency));
+
+            var frame_index: u32 = self.current_frame_index + 1;
+            for (0..MAX_FRAME_TIME_COUNT - 1) |graph_index| {
+                const frame_times: FrameTimes = self.frame_times[@mod(frame_index, MAX_FRAME_TIME_COUNT)];
+                if (frame_times.end > 0) {
+                    const tick_time: u64 = frame_times.tick - frame_times.start;
+                    const draw_time: u64 = frame_times.draw - frame_times.start;
+                    const full_time: u64 = frame_times.end - frame_times.start;
+                    timings_tick[graph_index] = @as(f32, @floatFromInt(tick_time)) / performance_frequency;
+                    timings_draw[graph_index] = @as(f32, @floatFromInt(draw_time)) / performance_frequency;
+                    timings_full[graph_index] = @as(f32, @floatFromInt(full_time)) / performance_frequency;
+                }
+
+                frame_index += 1;
             }
 
             const window_position: imgui.ImVec2 = imgui.ImGui_GetWindowPos();
@@ -134,7 +134,7 @@ pub const FrameTimingsWindow = struct {
         imgui.ImGui_PlotLinesEx(
             "##FrameTimings_" ++ name,
             &data,
-            data.len,
+            data.len - 1,
             0,
             "",
             0,
