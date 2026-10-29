@@ -200,17 +200,19 @@ pub fn main(init: std.process.Init) !void {
             }
         }
     }
-    const target_frame_time: u64 = if (game_settings.frame_rate.type == .fixed)
-        @trunc(1000 / @as(f32, @floatFromInt(game_settings.frame_rate.target_frame_rate)))
+    const target_frame_time_ns: u64 = if (game_settings.frame_rate.type == .fixed)
+        @trunc(1_000_000_000 / @as(f32, @floatFromInt(game_settings.frame_rate.target_frame_rate)))
     else
         0;
 
-    var previous_frame_start_time: u64 = 0;
-    var frame_start_time: u64 = 0;
-    var frame_elapsed_time: u64 = 0;
+    var frame_start_time_ms: u64 = 0;
+    var frame_start_time_ns: u64 = 0;
+    var frame_elapsed_time_ns: u64 = 0;
+    var previous_frame_start_time_ns: u64 = 0;
     while (true) {
-        frame_start_time = sdl.SDL_GetTicks();
-        const delta_time = frame_start_time - previous_frame_start_time;
+        frame_start_time_ns = sdl.SDL_GetTicksNS();
+        frame_start_time_ms = frame_start_time_ns / 1_000_000;
+        const delta_time_ms = (frame_start_time_ns - previous_frame_start_time_ns) / 1_000_000;
 
         if (INTERNAL) {
             if (internal_dependencies.frame_timings_window) |frame_timings_window| {
@@ -249,19 +251,17 @@ pub fn main(init: std.process.Init) !void {
 
                 game.reloaded(state, imgui.context);
             }
+
+            if (memory_usage_window) |memory_usage| {
+                memory_usage.recordMemoryUsage(frame_start_time_ms, game_gpa);
+            }
         }
 
         if (!game.processInput(state)) {
             break;
         }
 
-        if (INTERNAL) {
-            if (memory_usage_window) |memory_usage| {
-                memory_usage.recordMemoryUsage(frame_start_time, game_gpa);
-            }
-        }
-
-        game.tick(state, frame_start_time, delta_time);
+        game.tick(state, frame_start_time_ms, delta_time_ms);
         if (INTERNAL) {
             if (internal_dependencies.frame_timings_window) |frame_timings_window| {
                 frame_timings_window.setFrameTime(.tick, sdl.SDL_GetPerformanceCounter());
@@ -269,27 +269,26 @@ pub fn main(init: std.process.Init) !void {
         }
 
         game.draw(state);
-        // TODO: How can we capture this value when using VSync? It seems like we get the same value for this as
-        // for the end of the frame when VSync is enabled.
         if (INTERNAL) {
             if (internal_dependencies.frame_timings_window) |frame_timings_window| {
                 frame_timings_window.setFrameTime(.draw, sdl.SDL_GetPerformanceCounter());
             }
         }
 
-        frame_elapsed_time = sdl.SDL_GetTicks() - frame_start_time;
         if (game_settings.frame_rate.type == .fixed) {
-            if (frame_elapsed_time < target_frame_time) {
-                sdl.SDL_Delay(@intCast(target_frame_time - frame_elapsed_time));
+            frame_elapsed_time_ns = sdl.SDL_GetTicksNS() - frame_start_time_ns;
+            if (frame_elapsed_time_ns < target_frame_time_ns) {
+                sdl.SDL_DelayNS(@intCast(target_frame_time_ns - frame_elapsed_time_ns));
             }
         }
-        previous_frame_start_time = frame_start_time;
 
         if (INTERNAL) {
             if (internal_dependencies.frame_timings_window) |frame_timings_window| {
                 frame_timings_window.setFrameTime(.end, sdl.SDL_GetPerformanceCounter());
             }
         }
+
+        previous_frame_start_time_ns = frame_start_time_ns;
     }
 
     game.deinit(state);
