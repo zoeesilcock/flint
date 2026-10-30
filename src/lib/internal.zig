@@ -60,17 +60,19 @@ pub const FrameTimingsWindow = struct {
             imgui.ImGui_SetNextWindowPos(self.position, imgui.ImGuiCond_FirstUseEver);
             imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 300, .y = 160 }, imgui.ImGuiCond_FirstUseEver);
 
+            imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_WindowBg, .{ .x = 0.06, .y = 0.06, .z = 0.06, .w = 0.4 });
+            defer imgui.ImGui_PopStyleColor();
+
             _ = imgui.ImGui_Begin(
                 "Frame timings",
                 null,
                 imgui.ImGuiWindowFlags_NoFocusOnAppearing |
                     imgui.ImGuiWindowFlags_NoNavFocus |
-                    imgui.ImGuiWindowFlags_NoNavInputs |
-                    imgui.ImGuiWindowFlags_NoBackground,
+                    imgui.ImGuiWindowFlags_NoNavInputs,
             );
             defer imgui.ImGui_End();
 
-            const max_value: f32 = 0.032; // 30 FPS.
+            const max_value: f32 = 0.033; // 30 FPS.
             const performance_frequency: f32 = @floatFromInt(self.performance_frequency);
 
             var timings_tick: [MAX_FRAME_TIME_COUNT]f32 = @splat(0);
@@ -96,29 +98,27 @@ pub const FrameTimingsWindow = struct {
             const size: imgui.ImVec2 = imgui.ImGui_GetContentRegionAvail();
             const position = imgui.ImGui_GetCursorPos();
 
-            drawGraph(position, size, .{ .x = 0.2, .y = 1, .z = 0.2, .w = 1 }, timings_tick, max_value, "GraphTick");
-            imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_FrameBg, .{ .x = 1, .y = 1, .z = 1, .w = 0 });
-            drawGraph(position, size, .{ .x = 1, .y = 1, .z = 0, .w = 1 }, timings_draw, max_value, "GraphDraw");
-            drawGraph(position, size, .{ .x = 1, .y = 0.2, .z = 0.2, .w = 1 }, timings_full, max_value, "GraphFull");
-            imgui.ImGui_PopStyleColor();
-
             var divider_position: imgui.ImVec2 = .{
                 .x = window_position.x + position.x,
-                .y = position.y + window_position.y,
+                .y = window_position.y + position.y,
             };
-            drawLine(divider_position, size.x, "32ms");
-            divider_position.y += size.y * 0.5;
+            drawLine(divider_position, size.x, "33ms");
+            divider_position.y += size.y * 0.495;
             drawLine(divider_position, size.x, "16ms");
-            divider_position.y += size.y * 0.25;
+            divider_position.y += size.y * 0.2525;
             drawLine(divider_position, size.x, "8ms");
+
+            drawGraph(position, size, .{ .x = 1, .y = 0.2, .z = 0.2, .w = 1 }, timings_full, max_value, "GraphFull");
+            drawGraph(position, size, .{ .x = 1, .y = 1, .z = 0, .w = 1 }, timings_draw, max_value, "GraphDraw");
+            drawGraph(position, size, .{ .x = 0.2, .y = 1, .z = 0.2, .w = 1 }, timings_tick, max_value, "GraphTick");
         }
     }
 
     fn drawLine(position: imgui.ImVec2, width: f32, comptime label: [:0]const u8) void {
         const white = imgui.ImGui_ColorConvertFloat4ToU32(.{ .x = 255, .y = 255, .z = 255, .w = 255 });
-        const draw_list: *imgui.ImDrawList = imgui.ImGui_GetForegroundDrawList();
+        const draw_list: *imgui.ImDrawList = imgui.ImGui_GetWindowDrawList();
         draw_list.AddLineHEx(position.x, position.x + width, position.y, white, 1);
-        draw_list.AddText(.{ .x = position.x + width, .y = position.y - 6 }, white, label.ptr);
+        draw_list.AddText(.{ .x = position.x, .y = position.y + 3 }, white, label.ptr);
     }
 
     fn drawGraph(
@@ -130,7 +130,9 @@ pub const FrameTimingsWindow = struct {
         comptime name: []const u8,
     ) void {
         imgui.ImGui_SetCursorPos(position);
+        imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_FrameBg, .{ .x = 1, .y = 1, .z = 1, .w = 0 });
         imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_PlotLines, color);
+        imgui.ImGui_PushStyleVarImVec2(imgui.ImGuiStyleVar_FramePadding, .{ .x = 0, .y = 0 });
         imgui.ImGui_PlotLinesEx(
             "##FrameTimings_" ++ name,
             &data,
@@ -142,7 +144,8 @@ pub const FrameTimingsWindow = struct {
             size,
             @sizeOf(f32),
         );
-        imgui.ImGui_PopStyleColor();
+        imgui.ImGui_PopStyleVar();
+        imgui.ImGui_PopStyleColorEx(2);
     }
 };
 
