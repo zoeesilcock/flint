@@ -78,7 +78,11 @@ pub const FrameTimingsWindow = struct {
             var timings_tick: [MAX_FRAME_TIME_COUNT]f32 = @splat(0);
             var timings_draw: [MAX_FRAME_TIME_COUNT]f32 = @splat(0);
             var timings_full: [MAX_FRAME_TIME_COUNT]f32 = @splat(0);
+            var timings_full_one_percent_low: [MAX_FRAME_TIME_COUNT / 10]f32 = @splat(0);
+            var timings_full_point_one_percent_low: [MAX_FRAME_TIME_COUNT / 100]f32 = @splat(0);
 
+            var frame_count: f32 = 0;
+            var total_duration: f32 = 0;
             var frame_index: u32 = self.current_frame_index + 1;
             for (0..MAX_FRAME_TIME_COUNT - 1) |graph_index| {
                 const frame_times: FrameTimes = self.frame_times[@mod(frame_index, MAX_FRAME_TIME_COUNT)];
@@ -88,15 +92,39 @@ pub const FrameTimingsWindow = struct {
                     const full_time: u64 = frame_times.end - frame_times.start;
                     timings_tick[graph_index] = @as(f32, @floatFromInt(tick_time)) / performance_frequency;
                     timings_draw[graph_index] = @as(f32, @floatFromInt(draw_time)) / performance_frequency;
-                    timings_full[graph_index] = @as(f32, @floatFromInt(full_time)) / performance_frequency;
+
+                    const full_duration: f32 = @as(f32, @floatFromInt(full_time)) / performance_frequency;
+                    timings_full[graph_index] = full_duration;
+
+                    if (full_duration > 0) {
+                        total_duration += full_duration;
+                        frame_count += 1;
+
+                        addLowTiming(&timings_full_one_percent_low, full_duration);
+                        addLowTiming(&timings_full_point_one_percent_low, full_duration);
+                    }
                 }
 
                 frame_index += 1;
             }
 
+            const average_fps: f32 = 1 / (total_duration / frame_count);
+            const one_percent_low_fps: f32 = getAverageFPS(&timings_full_one_percent_low, frame_count);
+            const point_one_percent_low_fps: f32 = getAverageFPS(&timings_full_point_one_percent_low, frame_count);
+
+            const fps_height: f32 = imgui.ImGui_GetFrameHeight();
+            imgui.ImGui_TextColored(
+                imgui.ImVec4{ .x = 0, .y = 1, .z = 0, .w = 1 },
+                "FPS AVG: %.0f | 1%% lows: %.0f | 0.1%% lows: %.0f",
+                average_fps,
+                one_percent_low_fps,
+                point_one_percent_low_fps,
+            );
+
             const window_position: imgui.ImVec2 = imgui.ImGui_GetWindowPos();
-            const size: imgui.ImVec2 = imgui.ImGui_GetContentRegionAvail();
+            var size: imgui.ImVec2 = imgui.ImGui_GetContentRegionAvail();
             const position = imgui.ImGui_GetCursorPos();
+            size.y -= fps_height;
 
             var divider_position: imgui.ImVec2 = .{
                 .x = window_position.x + position.x,
@@ -112,6 +140,23 @@ pub const FrameTimingsWindow = struct {
             drawGraph(position, size, .{ .x = 1, .y = 1, .z = 0, .w = 1 }, timings_draw, max_value, "GraphDraw");
             drawGraph(position, size, .{ .x = 0.2, .y = 1, .z = 0.2, .w = 1 }, timings_tick, max_value, "GraphTick");
         }
+    }
+
+    fn addLowTiming(timings: []f32, new_timing: f32) void {
+        for (timings) |*t| {
+            if (new_timing > t.*) {
+                t.* = new_timing;
+            }
+        }
+    }
+
+    fn getAverageFPS(timings: []f32, frame_count: f32) f32 {
+        var total: f32 = 0;
+        for (timings) |t| {
+            total += t;
+        }
+        const result: f32 = 1 / (total / @min(frame_count, @as(f32, @floatFromInt(timings.len))));
+        return result;
     }
 
     fn drawLine(position: imgui.ImVec2, width: f32, comptime label: [:0]const u8) void {
