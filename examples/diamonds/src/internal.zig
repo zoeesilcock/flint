@@ -145,7 +145,7 @@ pub fn processInputEvent(state: *State, event: sdl.SDL_Event) void {
         switch (event.key.key) {
             sdl.SDLK_F1 => {
                 if (state.dependencies.internal.frame_timings_window) |frame_timings_window| {
-                    frame_timings_window.visible = !frame_timings_window.visible;
+                    frame_timings_window.cycleDisplayMode();
                 }
             },
             sdl.SDLK_F2 => {

@@ -15,7 +15,7 @@ pub const FrameTimingsWindow = struct {
     performance_frequency: u64,
     frame_times: [MAX_FRAME_TIME_COUNT]FrameTimes,
     position: imgui.ImVec2,
-    visible: bool,
+    display_mode: FrameTimeDisplayMode,
 
     const MAX_FRAME_TIME_COUNT: u32 = 256;
 
@@ -33,11 +33,28 @@ pub const FrameTimingsWindow = struct {
         end: u64 = 0,
     };
 
+    pub const FrameTimeDisplayMode = enum(u32) {
+        None,
+        Average,
+        AverageAndLows,
+        AverageLowsAndGraph,
+    };
+
     pub fn init(self: *FrameTimingsWindow, frequency: u64) void {
         self.current_frame_index = 0;
         self.performance_frequency = frequency;
         self.frame_times = @splat(.{});
         self.position = imgui.ImVec2{ .x = 5, .y = 10 };
+        self.display_mode = .None;
+    }
+
+    /// Cycle through the display modes, see `FrameTimingsWindow.FrameTimeDisplayMode`.
+    pub fn cycleDisplayMode(self: *FrameTimingsWindow) void {
+        var mode: u32 = @backingInt(self.display_mode) + 1;
+        if (mode >= @typeInfo(FrameTimeDisplayMode).@"enum".field_names.len) {
+            mode = 0;
+        }
+        self.display_mode = @fromBackingInt(@intCast(mode));
     }
 
     pub fn addFrameTime(self: *FrameTimingsWindow, frame_time: u64) void {
@@ -56,17 +73,26 @@ pub const FrameTimingsWindow = struct {
 
     /// Display the frame timings window, call this function along with any other imgui drawing code.
     pub fn draw(self: *FrameTimingsWindow) void {
-        if (self.visible) {
+        if (self.display_mode != .None) {
             imgui.ImGui_SetNextWindowPos(self.position, imgui.ImGuiCond_FirstUseEver);
             imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 300, .y = 160 }, imgui.ImGuiCond_FirstUseEver);
-
             imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_WindowBg, .{ .x = 0.06, .y = 0.06, .z = 0.06, .w = 0.4 });
             defer imgui.ImGui_PopStyleColor();
 
+            var window_name: [*]const u8 = "Frame timings";
+            if (self.display_mode == .Average) {
+                imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 100, .y = 16 }, imgui.ImGuiCond_FirstUseEver);
+                window_name = "FPS";
+            } else if (self.display_mode == .AverageAndLows) {
+                imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 350, .y = 16 }, imgui.ImGuiCond_FirstUseEver);
+                window_name = "FPS and lows";
+            }
+
             _ = imgui.ImGui_Begin(
-                "Frame timings",
+                window_name,
                 null,
                 imgui.ImGuiWindowFlags_NoFocusOnAppearing |
+                    imgui.ImGuiWindowFlags_NoTitleBar |
                     imgui.ImGuiWindowFlags_NoNavFocus |
                     imgui.ImGuiWindowFlags_NoNavInputs,
             );
@@ -108,37 +134,51 @@ pub const FrameTimingsWindow = struct {
                 frame_index += 1;
             }
 
-            const average_fps: f32 = 1 / (total_duration / frame_count);
-            const one_percent_low_fps: f32 = getAverageFPS(&timings_full_one_percent_low, frame_count);
-            const point_one_percent_low_fps: f32 = getAverageFPS(&timings_full_point_one_percent_low, frame_count);
+            var fps_height: f32 = 0;
+            if (self.display_mode == .Average) {
+                const average_fps: f32 = 1 / (total_duration / frame_count);
 
-            const fps_height: f32 = imgui.ImGui_GetFrameHeight();
-            imgui.ImGui_TextColored(
-                imgui.ImVec4{ .x = 0, .y = 1, .z = 0, .w = 1 },
-                "FPS AVG: %.0f | 1%% lows: %.0f | 0.1%% lows: %.0f",
-                average_fps,
-                one_percent_low_fps,
-                point_one_percent_low_fps,
-            );
+                fps_height = imgui.ImGui_GetFrameHeight();
+                imgui.ImGui_TextColored(
+                    imgui.ImVec4{ .x = 0, .y = 1, .z = 0, .w = 1 },
+                    "FPS: %.0f",
+                    average_fps,
+                );
+            } else if (self.display_mode == .AverageAndLows or self.display_mode == .AverageLowsAndGraph) {
+                const average_fps: f32 = 1 / (total_duration / frame_count);
+                const one_percent_low_fps: f32 = getAverageFPS(&timings_full_one_percent_low, frame_count);
+                const point_one_percent_low_fps: f32 = getAverageFPS(&timings_full_point_one_percent_low, frame_count);
 
-            const window_position: imgui.ImVec2 = imgui.ImGui_GetWindowPos();
-            var size: imgui.ImVec2 = imgui.ImGui_GetContentRegionAvail();
-            const position = imgui.ImGui_GetCursorPos();
-            size.y -= fps_height;
+                fps_height = imgui.ImGui_GetFrameHeight();
+                imgui.ImGui_TextColored(
+                    imgui.ImVec4{ .x = 0, .y = 1, .z = 0, .w = 1 },
+                    "FPS AVG: %.0f | 1%% lows: %.0f | 0.1%% lows: %.0f",
+                    average_fps,
+                    one_percent_low_fps,
+                    point_one_percent_low_fps,
+                );
+            }
 
-            var divider_position: imgui.ImVec2 = .{
-                .x = window_position.x + position.x,
-                .y = window_position.y + position.y,
-            };
-            drawLine(divider_position, size.x, "33ms");
-            divider_position.y += size.y * 0.495;
-            drawLine(divider_position, size.x, "16ms");
-            divider_position.y += size.y * 0.2525;
-            drawLine(divider_position, size.x, "8ms");
+            if (self.display_mode == .AverageLowsAndGraph) {
+                const window_position: imgui.ImVec2 = imgui.ImGui_GetWindowPos();
+                var size: imgui.ImVec2 = imgui.ImGui_GetContentRegionAvail();
+                const position = imgui.ImGui_GetCursorPos();
+                size.y -= fps_height;
 
-            drawGraph(position, size, .{ .x = 1, .y = 0.2, .z = 0.2, .w = 1 }, timings_full, max_value, "GraphFull");
-            drawGraph(position, size, .{ .x = 1, .y = 1, .z = 0, .w = 1 }, timings_draw, max_value, "GraphDraw");
-            drawGraph(position, size, .{ .x = 0.2, .y = 1, .z = 0.2, .w = 1 }, timings_tick, max_value, "GraphTick");
+                var divider_position: imgui.ImVec2 = .{
+                    .x = window_position.x + position.x,
+                    .y = window_position.y + position.y,
+                };
+                drawLine(divider_position, size.x, "33ms");
+                divider_position.y += size.y * 0.495;
+                drawLine(divider_position, size.x, "16ms");
+                divider_position.y += size.y * 0.2525;
+                drawLine(divider_position, size.x, "8ms");
+
+                drawGraph(position, size, .{ .x = 1, .y = 0.2, .z = 0.2, .w = 1 }, timings_full, max_value, "GraphFull");
+                drawGraph(position, size, .{ .x = 1, .y = 1, .z = 0, .w = 1 }, timings_draw, max_value, "GraphDraw");
+                drawGraph(position, size, .{ .x = 0.2, .y = 1, .z = 0.2, .w = 1 }, timings_tick, max_value, "GraphTick");
+            }
         }
     }
 
