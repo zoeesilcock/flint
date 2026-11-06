@@ -153,7 +153,7 @@ pub export fn processInput(state_ptr: GameLib.GameStatePtr) bool {
                 sdl.SDLK_F1 => {
                     if (INTERNAL) {
                         if (is_down) {
-                            state.dependencies.internal.fps_window.cycleMode();
+                            state.dependencies.internal.frame_timings_window.cycleDisplayMode();
                         }
                     }
                 },
@@ -204,8 +204,6 @@ pub export fn tick(state_ptr: GameLib.GameStatePtr, time: u64, delta_time: u64) 
     state.delta_time = delta_time;
 
     if (INTERNAL) {
-        state.dependencies.internal.fps_window.addFrameTime(sdl.SDL_GetPerformanceCounter());
-
         state.internal.output.print("Hello world! Space is down: {s}", .{
             if (state.space_is_down) "true" else "false",
         });
@@ -248,8 +246,8 @@ fn drawGame(state: *State) void {
 }
 
 fn drawInternalUI(state: *State) void {
-    state.dependencies.internal.fps_window.draw();
     state.dependencies.internal.output.draw();
+    state.dependencies.internal.frame_timings_window.draw();
     state.dependencies.internal.memory_usage_window.draw();
 
     // Game state inspector

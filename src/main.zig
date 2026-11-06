@@ -123,8 +123,6 @@ pub fn main(init: std.process.Init) !void {
             .allocator = &internal_allocator,
             .output = internal_allocator.create(flint.internal.DebugOutputWindow) catch
                 @panic("Failed to allocate DebugOutputWindow."),
-            .fps_window = internal_allocator.create(flint.internal.FPSWindow) catch
-                @panic("Failed to allocate FPSWindow."),
             .frame_timings_window = internal_allocator.create(flint.internal.FrameTimingsWindow) catch
                 @panic("Failed to allocate FPSWindow."),
             .memory_usage_window = internal_allocator.create(flint.internal.MemoryUsageWindow) catch
@@ -132,11 +130,7 @@ pub fn main(init: std.process.Init) !void {
         };
 
         internal_dependencies.output.init(&internal_allocator);
-        internal_dependencies.fps_window.init(sdl.SDL_GetPerformanceFrequency());
-
-        if (internal_dependencies.frame_timings_window) |frame_timings_window| {
-            frame_timings_window.init(sdl.SDL_GetPerformanceFrequency());
-        }
+        internal_dependencies.frame_timings_window.init(sdl.SDL_GetPerformanceFrequency());
 
         internal_dependencies.memory_usage_window.init();
         memory_usage_window = internal_dependencies.memory_usage_window;
@@ -215,9 +209,7 @@ pub fn main(init: std.process.Init) !void {
         const delta_time_ms = (frame_start_time_ns - previous_frame_start_time_ns) / 1_000_000;
 
         if (INTERNAL) {
-            if (internal_dependencies.frame_timings_window) |frame_timings_window| {
-                frame_timings_window.addFrameTime(sdl.SDL_GetPerformanceCounter());
-            }
+            internal_dependencies.frame_timings_window.addFrameTime(sdl.SDL_GetPerformanceCounter());
 
             const assets_changed = assetsHaveChanged(allocator, init.io);
             const code_changed = codeHasChanged(allocator, init.io);
@@ -263,16 +255,12 @@ pub fn main(init: std.process.Init) !void {
 
         game.tick(state, frame_start_time_ms, delta_time_ms);
         if (INTERNAL) {
-            if (internal_dependencies.frame_timings_window) |frame_timings_window| {
-                frame_timings_window.setFrameTime(.tick, sdl.SDL_GetPerformanceCounter());
-            }
+            internal_dependencies.frame_timings_window.setFrameTime(.tick, sdl.SDL_GetPerformanceCounter());
         }
 
         game.draw(state);
         if (INTERNAL) {
-            if (internal_dependencies.frame_timings_window) |frame_timings_window| {
-                frame_timings_window.setFrameTime(.draw, sdl.SDL_GetPerformanceCounter());
-            }
+            internal_dependencies.frame_timings_window.setFrameTime(.draw, sdl.SDL_GetPerformanceCounter());
         }
 
         if (game_settings.frame_rate.type == .fixed) {
@@ -283,9 +271,7 @@ pub fn main(init: std.process.Init) !void {
         }
 
         if (INTERNAL) {
-            if (internal_dependencies.frame_timings_window) |frame_timings_window| {
-                frame_timings_window.setFrameTime(.end, sdl.SDL_GetPerformanceCounter());
-            }
+            internal_dependencies.frame_timings_window.setFrameTime(.end, sdl.SDL_GetPerformanceCounter());
         }
 
         previous_frame_start_time_ns = frame_start_time_ns;
