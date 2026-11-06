@@ -38,13 +38,14 @@ pub const FrameTimingsWindow = struct {
         Average,
         AverageAndLows,
         AverageLowsAndGraph,
+        AverageLowsAndGraphMaximized,
     };
 
     pub fn init(self: *FrameTimingsWindow, frequency: u64) void {
         self.current_frame_index = 0;
         self.performance_frequency = frequency;
         self.frame_times = @splat(.{});
-        self.position = imgui.ImVec2{ .x = 5, .y = 10 };
+        self.position = imgui.ImVec2{ .x = 5, .y = 5 };
         self.display_mode = .None;
     }
 
@@ -75,17 +76,31 @@ pub const FrameTimingsWindow = struct {
     pub fn draw(self: *FrameTimingsWindow) void {
         if (self.display_mode != .None) {
             imgui.ImGui_SetNextWindowPos(self.position, imgui.ImGuiCond_FirstUseEver);
-            imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 300, .y = 160 }, imgui.ImGuiCond_FirstUseEver);
+            imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 320, .y = 200 }, imgui.ImGuiCond_FirstUseEver);
             imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_WindowBg, .{ .x = 0.06, .y = 0.06, .z = 0.06, .w = 0.4 });
             defer imgui.ImGui_PopStyleColor();
 
             var window_name: [*]const u8 = "Frame timings";
             if (self.display_mode == .Average) {
-                imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 100, .y = 16 }, imgui.ImGuiCond_FirstUseEver);
+                imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 80, .y = 16 }, imgui.ImGuiCond_FirstUseEver);
                 window_name = "FPS";
             } else if (self.display_mode == .AverageAndLows) {
-                imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 350, .y = 16 }, imgui.ImGuiCond_FirstUseEver);
+                imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 320, .y = 16 }, imgui.ImGuiCond_FirstUseEver);
                 window_name = "FPS and lows";
+            } else if (self.display_mode == .AverageLowsAndGraphMaximized) {
+                if (imgui.ImGui_GetMainViewport()) |viewport| {
+                    const maximized_position: imgui.ImVec2 = .{
+                        .x = viewport.*.WorkPos.x + self.position.x,
+                        .y = viewport.*.WorkPos.y + self.position.y,
+                    };
+                    const maximized_size: imgui.ImVec2 = .{
+                        .x = viewport.*.WorkSize.x - self.position.x * 2,
+                        .y = viewport.*.WorkSize.y - self.position.y * 2,
+                    };
+                    imgui.ImGui_SetNextWindowPos(maximized_position, imgui.ImGuiCond_FirstUseEver);
+                    imgui.ImGui_SetNextWindowSize(maximized_size, imgui.ImGuiCond_FirstUseEver);
+                }
+                window_name = "FPS and lows+";
             }
 
             _ = imgui.ImGui_Begin(
@@ -144,7 +159,10 @@ pub const FrameTimingsWindow = struct {
                     "FPS: %.0f",
                     average_fps,
                 );
-            } else if (self.display_mode == .AverageAndLows or self.display_mode == .AverageLowsAndGraph) {
+            } else if (self.display_mode == .AverageAndLows or
+                self.display_mode == .AverageLowsAndGraph or
+                self.display_mode == .AverageLowsAndGraphMaximized)
+            {
                 const average_fps: f32 = 1 / (total_duration / frame_count);
                 const one_percent_low_fps: f32 = getAverageFPS(&timings_full_one_percent_low, frame_count);
                 const point_one_percent_low_fps: f32 = getAverageFPS(&timings_full_point_one_percent_low, frame_count);
@@ -159,7 +177,7 @@ pub const FrameTimingsWindow = struct {
                 );
             }
 
-            if (self.display_mode == .AverageLowsAndGraph) {
+            if (self.display_mode == .AverageLowsAndGraph or self.display_mode == .AverageLowsAndGraphMaximized) {
                 const window_position: imgui.ImVec2 = imgui.ImGui_GetWindowPos();
                 var size: imgui.ImVec2 = imgui.ImGui_GetContentRegionAvail();
                 const position = imgui.ImGui_GetCursorPos();
