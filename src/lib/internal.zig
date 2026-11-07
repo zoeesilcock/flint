@@ -154,11 +154,9 @@ pub const FrameTimingsWindow = struct {
                 frame_index += 1;
             }
 
-            var fps_height: f32 = 0;
             if (self.display_mode == .Average) {
                 const average_fps: f32 = 1 / (total_duration / frame_count);
 
-                fps_height = imgui.ImGui_GetFrameHeight();
                 imgui.ImGui_TextColored(
                     imgui.ImVec4{ .x = 0, .y = 1, .z = 0, .w = 1 },
                     "FPS: %.0f",
@@ -172,7 +170,6 @@ pub const FrameTimingsWindow = struct {
                 const one_percent_low_fps: f32 = getAverageFPS(&timings_full_one_percent_low, frame_count);
                 const point_one_percent_low_fps: f32 = getAverageFPS(&timings_full_point_one_percent_low, frame_count);
 
-                fps_height = imgui.ImGui_GetFrameHeight();
                 imgui.ImGui_TextColored(
                     imgui.ImVec4{ .x = 0, .y = 1, .z = 0, .w = 1 },
                     "FPS AVG: %.0f | 1%% lows: %.0f | 0.1%% lows: %.0f",
@@ -184,14 +181,16 @@ pub const FrameTimingsWindow = struct {
 
             if (self.display_mode == .AverageLowsAndGraph or self.display_mode == .AverageLowsAndGraphMaximized) {
                 const window_position: imgui.ImVec2 = imgui.ImGui_GetWindowPos();
-                var size: imgui.ImVec2 = imgui.ImGui_GetContentRegionAvail();
+                const size: imgui.ImVec2 = imgui.ImGui_GetContentRegionAvail();
                 const position = imgui.ImGui_GetCursorPos();
-                size.y -= fps_height;
 
-                var divider_position: imgui.ImVec2 = .{
+                const start_position: imgui.ImVec2 = .{
                     .x = window_position.x + position.x,
                     .y = window_position.y + position.y,
                 };
+                drawGraphFrame(start_position, size);
+
+                var divider_position: imgui.ImVec2 = start_position;
                 drawLine(divider_position, size.x, "33ms");
                 divider_position.y += size.y * 0.495;
                 drawLine(divider_position, size.x, "16ms");
@@ -223,10 +222,30 @@ pub const FrameTimingsWindow = struct {
     }
 
     fn drawLine(position: imgui.ImVec2, width: f32, comptime label: [:0]const u8) void {
-        const white = imgui.ImGui_ColorConvertFloat4ToU32(.{ .x = 255, .y = 255, .z = 255, .w = 255 });
+        const white = imgui.ImGui_ColorConvertFloat4ToU32(.{ .x = 1, .y = 1, .z = 1, .w = 1 });
         const draw_list: *imgui.ImDrawList = imgui.ImGui_GetWindowDrawList();
         draw_list.AddLineHEx(position.x, position.x + width, position.y, white, 1);
-        draw_list.AddText(.{ .x = position.x, .y = position.y + 3 }, white, label.ptr);
+        draw_list.AddText(.{ .x = position.x + 3, .y = position.y + 3 }, white, label.ptr);
+    }
+
+    fn drawGraphFrame(position: imgui.ImVec2, size: imgui.ImVec2) void {
+        const white = imgui.ImGui_ColorConvertFloat4ToU32(.{ .x = 1, .y = 1, .z = 1, .w = 0.5 });
+        const draw_list: *imgui.ImDrawList = imgui.ImGui_GetWindowDrawList();
+
+        var from_position: imgui.ImVec2 = position;
+        var to_position: imgui.ImVec2 = .{ .x = position.x, .y = position.y + size.y };
+        draw_list.AddLineEx(from_position, to_position, white, 1);
+
+        to_position = .{ .x = position.x + size.x, .y = position.y };
+        draw_list.AddLineEx(from_position, to_position, white, 1);
+
+        from_position = .{ .x = position.x, .y = position.y + size.y };
+        to_position = .{ .x = position.x + size.x, .y = position.y + size.y };
+        draw_list.AddLineEx(from_position, to_position, white, 1);
+
+        from_position = .{ .x = position.x + size.x, .y = position.y };
+        to_position = .{ .x = position.x + size.x, .y = position.y + size.y };
+        draw_list.AddLineEx(from_position, to_position, white, 1);
     }
 
     fn drawGraph(
