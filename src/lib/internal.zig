@@ -9,7 +9,12 @@ const imgui = @import("imgui.zig").c;
 
 const DebugAllocator = @import("GameLib.zig").DebugAllocator;
 
-/// Displays a graph of the frame timings for the last 300 frames.
+/// Displays a graph of the frame timings for the last 256 frames.
+///
+/// The graph shows three different lines that show when the following things complete:
+/// * Green: after the tick function.
+/// * Yellow: after the draw function.
+/// * Red: end of frame.
 pub const FrameTimingsWindow = struct {
     current_frame_index: u32,
     performance_frequency: u64,
@@ -49,15 +54,6 @@ pub const FrameTimingsWindow = struct {
         self.display_mode = .None;
     }
 
-    /// Cycle through the display modes, see `FrameTimingsWindow.FrameTimeDisplayMode`.
-    pub fn cycleDisplayMode(self: *FrameTimingsWindow) void {
-        var mode: u32 = @backingInt(self.display_mode) + 1;
-        if (mode >= @typeInfo(FrameTimeDisplayMode).@"enum".field_names.len) {
-            mode = 0;
-        }
-        self.display_mode = @fromBackingInt(@intCast(mode));
-    }
-
     pub fn addFrameTime(self: *FrameTimingsWindow, frame_time: u64) void {
         self.current_frame_index = @mod(self.current_frame_index + 1, MAX_FRAME_TIME_COUNT);
         self.setFrameTime(.start, frame_time);
@@ -70,6 +66,15 @@ pub const FrameTimingsWindow = struct {
             .draw => self.frame_times[self.current_frame_index].draw = frame_time,
             .end => self.frame_times[self.current_frame_index].end = frame_time,
         }
+    }
+
+    /// Cycle through the display modes, see `FrameTimingsWindow.FrameTimeDisplayMode`.
+    pub fn cycleDisplayMode(self: *FrameTimingsWindow) void {
+        var mode: u32 = @backingInt(self.display_mode) + 1;
+        if (mode >= @typeInfo(FrameTimeDisplayMode).@"enum".field_names.len) {
+            mode = 0;
+        }
+        self.display_mode = @fromBackingInt(@intCast(mode));
     }
 
     /// Display the frame timings window, call this function along with any other imgui drawing code.
