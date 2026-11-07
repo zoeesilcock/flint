@@ -144,7 +144,7 @@ pub fn processInputEvent(state: *State, event: sdl.SDL_Event) void {
     if (event.type == sdl.SDL_EVENT_KEY_DOWN) {
         switch (event.key.key) {
             sdl.SDLK_F1 => {
-                state.dependencies.internal.fps_window.cycleMode();
+                state.dependencies.internal.frame_timings_window.cycleDisplayMode();
             },
             sdl.SDLK_F2 => {
                 state.dependencies.internal.memory_usage_window.visible =
@@ -221,12 +221,6 @@ pub fn updateWindowSize(state: *State) void {
                 _ = sdl.SDL_SetWindowPosition(state.window, x, y);
                 _ = sdl.SDL_SetWindowSize(state.window, width, height);
             }
-
-            state.dependencies.internal.fps_window.position =
-                if (state.internal.show_sidebar)
-                    .{ .x = 225, .y = -5 }
-                else
-                    .{ .x = 5, .y = 5 };
         }
     }
 }
@@ -389,8 +383,8 @@ pub fn drawDebugUI(state: *State) void {
         null,
     );
 
-    state.dependencies.internal.fps_window.draw();
     state.dependencies.internal.output.draw();
+    state.dependencies.internal.frame_timings_window.draw();
 
     if (state.internal.show_sidebar) {
         {

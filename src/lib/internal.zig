@@ -9,124 +9,270 @@ const imgui = @import("imgui.zig").c;
 
 const DebugAllocator = @import("GameLib.zig").DebugAllocator;
 
-/// This window displays a rolling average of frame times over the last 300 frames.
-pub const FPSWindow = struct {
+/// Displays a graph of the frame timings for the last 256 frames.
+///
+/// The graph shows three different lines that show when the following things complete:
+/// * Green: after the tick function.
+/// * Yellow: after the draw function.
+/// * Red: end of frame.
+pub const FrameTimingsWindow = struct {
     current_frame_index: u32,
     performance_frequency: u64,
-    frame_times: [MAX_FRAME_TIME_COUNT]u64,
-    average: f32,
-    display_mode: FPSDisplayMode,
+    frame_times: [MAX_FRAME_TIME_COUNT]FrameTimes,
     position: imgui.ImVec2,
+    display_mode: FrameTimeDisplayMode,
 
-    const MAX_FRAME_TIME_COUNT: u32 = 300;
+    const MAX_FRAME_TIME_COUNT: u32 = 256;
 
-    pub const FPSDisplayMode = enum {
-        None,
-        Number,
-        NumberAndGraph,
+    const FrameTimeType = enum(u32) {
+        start,
+        tick,
+        draw,
+        end,
     };
 
-    pub fn init(self: *FPSWindow, frequency: u64) void {
+    const FrameTimes = struct {
+        start: u64 = 0,
+        tick: u64 = 0,
+        draw: u64 = 0,
+        end: u64 = 0,
+    };
+
+    pub const FrameTimeDisplayMode = enum(u32) {
+        None,
+        Average,
+        AverageAndLows,
+        AverageLowsAndGraph,
+        AverageLowsAndGraphMaximized,
+    };
+
+    pub fn init(self: *FrameTimingsWindow, frequency: u64) void {
         self.current_frame_index = 0;
         self.performance_frequency = frequency;
-        self.frame_times = @splat(0);
-        self.average = 0;
-        self.display_mode = .Number;
+        self.frame_times = @splat(.{});
         self.position = imgui.ImVec2{ .x = 5, .y = 5 };
+        self.display_mode = .None;
     }
 
-    /// Cycle through the display modes, see `FPSWindow.FPSDisplayMode`.
-    pub fn cycleMode(self: *FPSWindow) void {
+    pub fn addFrameTime(self: *FrameTimingsWindow, frame_time: u64) void {
+        self.current_frame_index = @mod(self.current_frame_index + 1, MAX_FRAME_TIME_COUNT);
+        self.setFrameTime(.start, frame_time);
+    }
+
+    pub fn setFrameTime(self: *FrameTimingsWindow, frame_type: FrameTimeType, frame_time: u64) void {
+        switch (frame_type) {
+            .start => self.frame_times[self.current_frame_index].start = frame_time,
+            .tick => self.frame_times[self.current_frame_index].tick = frame_time,
+            .draw => self.frame_times[self.current_frame_index].draw = frame_time,
+            .end => self.frame_times[self.current_frame_index].end = frame_time,
+        }
+    }
+
+    /// Cycle through the display modes, see `FrameTimingsWindow.FrameTimeDisplayMode`.
+    pub fn cycleDisplayMode(self: *FrameTimingsWindow) void {
         var mode: u32 = @backingInt(self.display_mode) + 1;
-        if (mode >= @typeInfo(FPSDisplayMode).@"enum".field_names.len) {
+        if (mode >= @typeInfo(FrameTimeDisplayMode).@"enum".field_names.len) {
             mode = 0;
         }
         self.display_mode = @fromBackingInt(@intCast(mode));
     }
 
-    fn getPreviousFrameIndex(frame_index: u32) u32 {
-        var previous_frame_index: u32 = frame_index -% 1;
-        if (previous_frame_index > MAX_FRAME_TIME_COUNT) {
-            previous_frame_index = MAX_FRAME_TIME_COUNT - 1;
-        }
-        return previous_frame_index;
-    }
-
-    fn getFrameTime(self: *FPSWindow, frame_index: u32) f32 {
-        var elapsed: u64 = 0;
-        const previous_frame_index = getPreviousFrameIndex(frame_index);
-
-        const current_frame = self.frame_times[frame_index];
-        const previous_frame = self.frame_times[previous_frame_index];
-        if (current_frame > 0 and previous_frame > 0 and current_frame > previous_frame) {
-            elapsed = current_frame - previous_frame;
-        }
-
-        return @as(f32, @floatFromInt(elapsed)) / @as(f32, @floatFromInt(self.performance_frequency));
-    }
-
-    /// Call this on every frame with the current time from `SDL_GetPerformanceCounter`.
-    pub fn addFrameTime(self: *FPSWindow, frame_time: u64) void {
-        self.current_frame_index += 1;
-        if (self.current_frame_index >= MAX_FRAME_TIME_COUNT) {
-            self.current_frame_index = 0;
-        }
-        self.frame_times[self.current_frame_index] = frame_time;
-
-        var average: f32 = 0;
-        for (0..MAX_FRAME_TIME_COUNT) |i| {
-            average += self.getFrameTime(@intCast(i));
-        }
-        self.average = 1 / (average / @as(f32, @floatFromInt(MAX_FRAME_TIME_COUNT)));
-    }
-
-    /// Display the FPS window, call this function along with any other imgui drawing code.
-    pub fn draw(self: *FPSWindow) void {
+    /// Display the frame timings window, call this function along with any other imgui drawing code.
+    pub fn draw(self: *FrameTimingsWindow) void {
         if (self.display_mode != .None) {
-            imgui.ImGui_SetNextWindowPosEx(self.position, 0, imgui.ImVec2{ .x = 0, .y = 0 });
-            imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 300, .y = 160 }, 0);
+            imgui.ImGui_SetNextWindowPos(self.position, imgui.ImGuiCond_FirstUseEver);
+            imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 320, .y = 200 }, imgui.ImGuiCond_FirstUseEver);
+            imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_WindowBg, .{ .x = 0.06, .y = 0.06, .z = 0.06, .w = 0.4 });
+            defer imgui.ImGui_PopStyleColor();
+
+            var window_name: [*]const u8 = "Frame timings";
+            if (self.display_mode == .Average) {
+                imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 80, .y = 16 }, imgui.ImGuiCond_FirstUseEver);
+                window_name = "FPS";
+            } else if (self.display_mode == .AverageAndLows) {
+                imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 320, .y = 16 }, imgui.ImGuiCond_FirstUseEver);
+                window_name = "FPS and lows";
+            } else if (self.display_mode == .AverageLowsAndGraphMaximized) {
+                if (imgui.ImGui_GetMainViewport()) |viewport| {
+                    const maximized_position: imgui.ImVec2 = .{
+                        .x = viewport.*.WorkPos.x + self.position.x,
+                        .y = viewport.*.WorkPos.y + self.position.y,
+                    };
+                    const maximized_size: imgui.ImVec2 = .{
+                        .x = viewport.*.WorkSize.x - self.position.x * 2,
+                        .y = viewport.*.WorkSize.y - self.position.y * 2,
+                    };
+                    imgui.ImGui_SetNextWindowPos(maximized_position, imgui.ImGuiCond_FirstUseEver);
+                    imgui.ImGui_SetNextWindowSize(maximized_size, imgui.ImGuiCond_FirstUseEver);
+                }
+                window_name = "FPS and lows+";
+            }
 
             _ = imgui.ImGui_Begin(
-                "FPS",
+                window_name,
                 null,
                 imgui.ImGuiWindowFlags_NoFocusOnAppearing |
-                    imgui.ImGuiWindowFlags_NoMove |
-                    imgui.ImGuiWindowFlags_NoResize |
-                    imgui.ImGuiWindowFlags_NoBackground |
                     imgui.ImGuiWindowFlags_NoTitleBar |
-                    imgui.ImGuiWindowFlags_NoMouseInputs,
+                    imgui.ImGuiWindowFlags_NoNavFocus |
+                    imgui.ImGuiWindowFlags_NoNavInputs,
             );
+            defer imgui.ImGui_End();
 
-            imgui.ImGui_TextColored(
-                imgui.ImVec4{ .x = 0, .y = 1, .z = 0, .w = 1 },
-                "FPS: %.0f",
-                self.average,
-            );
+            const max_value: f32 = 0.033; // 30 FPS.
+            const performance_frequency: f32 = @floatFromInt(self.performance_frequency);
 
-            if (self.display_mode == .NumberAndGraph) {
-                var timings: [MAX_FRAME_TIME_COUNT]f32 = @splat(0);
-                var max_value: f32 = 0;
-                for (0..MAX_FRAME_TIME_COUNT) |i| {
-                    timings[i] = self.getFrameTime(@intCast(i));
-                    if (timings[i] > max_value) {
-                        max_value = timings[i];
+            var timings_tick: [MAX_FRAME_TIME_COUNT]f32 = @splat(0);
+            var timings_draw: [MAX_FRAME_TIME_COUNT]f32 = @splat(0);
+            var timings_full: [MAX_FRAME_TIME_COUNT]f32 = @splat(0);
+            var timings_full_one_percent_low: [MAX_FRAME_TIME_COUNT / 10]f32 = @splat(0);
+            var timings_full_point_one_percent_low: [MAX_FRAME_TIME_COUNT / 100]f32 = @splat(0);
+
+            var frame_count: f32 = 0;
+            var total_duration: f32 = 0;
+            var frame_index: u32 = self.current_frame_index + 1;
+            for (0..MAX_FRAME_TIME_COUNT - 1) |graph_index| {
+                const frame_times: FrameTimes = self.frame_times[@mod(frame_index, MAX_FRAME_TIME_COUNT)];
+                if (frame_times.end > 0) {
+                    const tick_time: u64 = frame_times.tick - frame_times.start;
+                    const draw_time: u64 = frame_times.draw - frame_times.start;
+                    const full_time: u64 = frame_times.end - frame_times.start;
+                    timings_tick[graph_index] = @as(f32, @floatFromInt(tick_time)) / performance_frequency;
+                    timings_draw[graph_index] = @as(f32, @floatFromInt(draw_time)) / performance_frequency;
+
+                    const full_duration: f32 = @as(f32, @floatFromInt(full_time)) / performance_frequency;
+                    timings_full[graph_index] = full_duration;
+
+                    if (full_duration > 0) {
+                        total_duration += full_duration;
+                        frame_count += 1;
+
+                        addLowTiming(&timings_full_one_percent_low, full_duration);
+                        addLowTiming(&timings_full_point_one_percent_low, full_duration);
                     }
                 }
-                imgui.ImGui_PlotHistogramEx(
-                    "##FPS_Graph",
-                    &timings,
-                    timings.len,
-                    0,
-                    "",
-                    0,
-                    max_value,
-                    imgui.ImVec2{ .x = 300, .y = 100 },
-                    @sizeOf(f32),
+
+                frame_index += 1;
+            }
+
+            if (self.display_mode == .Average) {
+                const average_fps: f32 = 1 / (total_duration / frame_count);
+
+                imgui.ImGui_TextColored(
+                    imgui.ImVec4{ .x = 0, .y = 1, .z = 0, .w = 1 },
+                    "FPS: %.0f",
+                    average_fps,
+                );
+            } else if (self.display_mode == .AverageAndLows or
+                self.display_mode == .AverageLowsAndGraph or
+                self.display_mode == .AverageLowsAndGraphMaximized)
+            {
+                const average_fps: f32 = 1 / (total_duration / frame_count);
+                const one_percent_low_fps: f32 = getAverageFPS(&timings_full_one_percent_low, frame_count);
+                const point_one_percent_low_fps: f32 = getAverageFPS(&timings_full_point_one_percent_low, frame_count);
+
+                imgui.ImGui_TextColored(
+                    imgui.ImVec4{ .x = 0, .y = 1, .z = 0, .w = 1 },
+                    "FPS AVG: %.0f | 1%% lows: %.0f | 0.1%% lows: %.0f",
+                    average_fps,
+                    one_percent_low_fps,
+                    point_one_percent_low_fps,
                 );
             }
 
-            imgui.ImGui_End();
+            if (self.display_mode == .AverageLowsAndGraph or self.display_mode == .AverageLowsAndGraphMaximized) {
+                const window_position: imgui.ImVec2 = imgui.ImGui_GetWindowPos();
+                const size: imgui.ImVec2 = imgui.ImGui_GetContentRegionAvail();
+                const position = imgui.ImGui_GetCursorPos();
+
+                const start_position: imgui.ImVec2 = .{
+                    .x = window_position.x + position.x,
+                    .y = window_position.y + position.y,
+                };
+                drawGraphFrame(start_position, size);
+
+                var divider_position: imgui.ImVec2 = start_position;
+                drawLine(divider_position, size.x, "33ms");
+                divider_position.y += size.y * 0.495;
+                drawLine(divider_position, size.x, "16ms");
+                divider_position.y += size.y * 0.2525;
+                drawLine(divider_position, size.x, "8ms");
+
+                drawGraph(position, size, .{ .x = 1, .y = 0.2, .z = 0.2, .w = 1 }, timings_full, max_value, "GraphFull");
+                drawGraph(position, size, .{ .x = 1, .y = 1, .z = 0, .w = 1 }, timings_draw, max_value, "GraphDraw");
+                drawGraph(position, size, .{ .x = 0.2, .y = 1, .z = 0.2, .w = 1 }, timings_tick, max_value, "GraphTick");
+            }
         }
+    }
+
+    fn addLowTiming(timings: []f32, new_timing: f32) void {
+        for (timings) |*t| {
+            if (new_timing > t.*) {
+                t.* = new_timing;
+            }
+        }
+    }
+
+    fn getAverageFPS(timings: []f32, frame_count: f32) f32 {
+        var total: f32 = 0;
+        for (timings) |t| {
+            total += t;
+        }
+        const result: f32 = 1 / (total / @min(frame_count, @as(f32, @floatFromInt(timings.len))));
+        return result;
+    }
+
+    fn drawLine(position: imgui.ImVec2, width: f32, comptime label: [:0]const u8) void {
+        const white = imgui.ImGui_ColorConvertFloat4ToU32(.{ .x = 1, .y = 1, .z = 1, .w = 1 });
+        const draw_list: *imgui.ImDrawList = imgui.ImGui_GetWindowDrawList();
+        draw_list.AddLineHEx(position.x, position.x + width, position.y, white, 1);
+        draw_list.AddText(.{ .x = position.x + 3, .y = position.y + 3 }, white, label.ptr);
+    }
+
+    fn drawGraphFrame(position: imgui.ImVec2, size: imgui.ImVec2) void {
+        const white = imgui.ImGui_ColorConvertFloat4ToU32(.{ .x = 1, .y = 1, .z = 1, .w = 0.5 });
+        const draw_list: *imgui.ImDrawList = imgui.ImGui_GetWindowDrawList();
+
+        var from_position: imgui.ImVec2 = position;
+        var to_position: imgui.ImVec2 = .{ .x = position.x, .y = position.y + size.y };
+        draw_list.AddLineEx(from_position, to_position, white, 1);
+
+        to_position = .{ .x = position.x + size.x, .y = position.y };
+        draw_list.AddLineEx(from_position, to_position, white, 1);
+
+        from_position = .{ .x = position.x, .y = position.y + size.y };
+        to_position = .{ .x = position.x + size.x, .y = position.y + size.y };
+        draw_list.AddLineEx(from_position, to_position, white, 1);
+
+        from_position = .{ .x = position.x + size.x, .y = position.y };
+        to_position = .{ .x = position.x + size.x, .y = position.y + size.y };
+        draw_list.AddLineEx(from_position, to_position, white, 1);
+    }
+
+    fn drawGraph(
+        position: imgui.ImVec2,
+        size: imgui.ImVec2,
+        color: imgui.ImVec4,
+        data: [MAX_FRAME_TIME_COUNT]f32,
+        max_value: f32,
+        comptime name: []const u8,
+    ) void {
+        imgui.ImGui_SetCursorPos(position);
+        imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_FrameBg, .{ .x = 1, .y = 1, .z = 1, .w = 0 });
+        imgui.ImGui_PushStyleColorImVec4(imgui.ImGuiCol_PlotLines, color);
+        imgui.ImGui_PushStyleVarImVec2(imgui.ImGuiStyleVar_FramePadding, .{ .x = 0, .y = 0 });
+        imgui.ImGui_PlotLinesEx(
+            "##FrameTimings_" ++ name,
+            &data,
+            data.len - 1,
+            0,
+            "",
+            0,
+            max_value,
+            size,
+            @sizeOf(f32),
+        );
+        imgui.ImGui_PopStyleVar();
+        imgui.ImGui_PopStyleColorEx(2);
     }
 };
 
