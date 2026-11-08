@@ -63,6 +63,10 @@ This example uses the SDL3 GPU API to render a cube.
 ### [Template](examples/template/README.md)
 This example aims to a minimal implementation of a project. If you want to get up and running with your own project quickly this is a good place to start.
 
+### [Wildcar](https://github.com/zoeesilcock/wildcar)
+Side project that implements a full 3D renderer using SDL GPU, including day night cycle, a light source, shadows, .glb model loading, and features vehicle physics built using Box3D.
+![Cube screenshot](examples/wildcar-screenshot.png)
+
 
 ## Rationale
 Making games is hard and time consuming, and it's usually not possible to know in advance what will be fun. This means that iteration speed and flexibility of experimentation are the most important factors in increasing the chances of finding the fun.
