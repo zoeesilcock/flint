@@ -224,28 +224,14 @@ pub const FrameTimingsWindow = struct {
     fn drawLine(position: imgui.ImVec2, width: f32, comptime label: [:0]const u8) void {
         const white = imgui.ImGui_ColorConvertFloat4ToU32(.{ .x = 1, .y = 1, .z = 1, .w = 1 });
         const draw_list: *imgui.ImDrawList = imgui.ImGui_GetWindowDrawList();
-        draw_list.AddLineHEx(position.x, position.x + width, position.y, white, 1);
+        draw_list.AddLineHEx(position.x, position.x + width, position.y, white, 1, 0);
         draw_list.AddText(.{ .x = position.x + 3, .y = position.y + 3 }, white, label.ptr);
     }
 
     fn drawGraphFrame(position: imgui.ImVec2, size: imgui.ImVec2) void {
         const white = imgui.ImGui_ColorConvertFloat4ToU32(.{ .x = 1, .y = 1, .z = 1, .w = 0.5 });
         const draw_list: *imgui.ImDrawList = imgui.ImGui_GetWindowDrawList();
-
-        var from_position: imgui.ImVec2 = position;
-        var to_position: imgui.ImVec2 = .{ .x = position.x, .y = position.y + size.y };
-        draw_list.AddLineEx(from_position, to_position, white, 1);
-
-        to_position = .{ .x = position.x + size.x, .y = position.y };
-        draw_list.AddLineEx(from_position, to_position, white, 1);
-
-        from_position = .{ .x = position.x, .y = position.y + size.y };
-        to_position = .{ .x = position.x + size.x, .y = position.y + size.y };
-        draw_list.AddLineEx(from_position, to_position, white, 1);
-
-        from_position = .{ .x = position.x + size.x, .y = position.y };
-        to_position = .{ .x = position.x + size.x, .y = position.y + size.y };
-        draw_list.AddLineEx(from_position, to_position, white, 1);
+        draw_list.AddRectEx(position, .{ .x = position.x + size.x, .y = position.y + size.y }, white, 0, 1, 0);
     }
 
     fn drawGraph(
