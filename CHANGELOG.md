@@ -22,7 +22,7 @@ The format is roughly speaking 0.MAJOR.MINOR.PATCH.
 * Added error handling to the loading of the game library so that we surface errors like undefined symbol that previously were reported as FileNotFound.
 ### Changed
 * [Breaking] Updated minimum Zig version to 0.17.0.
-* Updated SDL to version 3.4.16.
+* Updated SDL to version 3.4.20.
 * Updated umgui to version 1.92.9b.
 * The imgui.ini is now placed in the same directory as the executable, regardless of where it was launched from.
 * The default setting for frame rate is now vsync on every frame, previously it was unconstrained in internal builds and fixed to 120 FPS in non-internal builds.
