@@ -344,6 +344,7 @@ pub var settings: GameLib.Settings = .{
     .title = "Diamonds",
     .window_width = WINDOW_WIDTH + if (INTERNAL) internal.WINDOW_WIDTH_ADDITIONAL else 0,
     .window_height = WINDOW_HEIGHT,
+    .frame_rate = .fixed(60),
 };
 
 pub export fn getSettings() GameLib.Settings {
@@ -513,10 +514,6 @@ pub export fn processInput(state_ptr: GameLib.GameStatePtr) bool {
 
 pub export fn tick(state_ptr: GameLib.GameStatePtr, time: u64, delta_time_int: u64) void {
     const state: *State = @ptrCast(@alignCast(state_ptr));
-
-    if (INTERNAL) {
-        state.dependencies.internal.fps_window.addFrameTime(sdl.SDL_GetPerformanceCounter());
-    }
 
     state.delta_time_actual = delta_time_int;
     state.time = time;

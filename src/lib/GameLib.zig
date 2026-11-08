@@ -119,7 +119,7 @@ pub const Dependencies = struct {
         imgui_context: *imgui.ImGuiContext = undefined,
         allocator: *std.mem.Allocator = undefined,
         output: *internal.DebugOutputWindow = undefined,
-        fps_window: *internal.FPSWindow = undefined,
+        frame_timings_window: *internal.FrameTimingsWindow = undefined,
         memory_usage_window: *internal.MemoryUsageWindow = undefined,
     } else extern struct {};
 };

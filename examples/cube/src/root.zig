@@ -338,7 +338,7 @@ pub export fn processInput(state_ptr: GameLib.GameStatePtr) bool {
                 },
                 sdl.SDLK_F1 => {
                     if (INTERNAL) {
-                        state.dependencies.internal.fps_window.cycleMode();
+                        state.dependencies.internal.frame_timings_window.cycleDisplayMode();
                     }
                 },
                 sdl.SDLK_F2 => {
@@ -379,10 +379,6 @@ pub export fn tick(state_ptr: GameLib.GameStatePtr, time: u64, delta_time: u64) 
     state.time = time;
     state.delta_time_actual = delta_time;
     state.delta_time = if (state.paused) 0 else state.delta_time_actual;
-
-    if (INTERNAL) {
-        state.dependencies.internal.fps_window.addFrameTime(sdl.SDL_GetPerformanceCounter());
-    }
 
     const test_entity = &state.entities.items[0];
     test_entity.rotation[Y] += 1 * state.deltaTime();
@@ -495,8 +491,8 @@ pub export fn draw(state_ptr: GameLib.GameStatePtr) void {
 
         if (INTERNAL) {
             imgui.newFrame();
-            state.dependencies.internal.fps_window.draw();
             state.dependencies.internal.output.draw();
+            state.dependencies.internal.frame_timings_window.draw();
             state.dependencies.internal.memory_usage_window.draw();
 
             if (state.internal.inspect_game_state) {
