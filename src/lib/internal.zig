@@ -87,10 +87,10 @@ pub const FrameTimingsWindow = struct {
 
             var window_name: [*]const u8 = "Frame timings";
             if (self.display_mode == .Average) {
-                imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 80, .y = 16 }, imgui.ImGuiCond_FirstUseEver);
+                imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 80, .y = 32 }, imgui.ImGuiCond_FirstUseEver);
                 window_name = "FPS";
             } else if (self.display_mode == .AverageAndLows) {
-                imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 320, .y = 16 }, imgui.ImGuiCond_FirstUseEver);
+                imgui.ImGui_SetNextWindowSize(imgui.ImVec2{ .x = 320, .y = 32 }, imgui.ImGuiCond_FirstUseEver);
                 window_name = "FPS and lows";
             } else if (self.display_mode == .AverageLowsAndGraphMaximized) {
                 if (imgui.ImGui_GetMainViewport()) |viewport| {

@@ -49,7 +49,9 @@ const State = struct {
 
         if (INTERNAL) {
             state.internal.output = dependencies.internal.output;
-            state.dependencies.internal.memory_usage_window.position = imgui.c.ImVec2{ .x = 320, .y = 40 };
+            state.dependencies.internal.output.position = imgui.c.ImVec2{ .x = 5, .y = 41 };
+            state.dependencies.internal.frame_timings_window.display_mode = .Average;
+            state.dependencies.internal.memory_usage_window.position = imgui.c.ImVec2{ .x = 309, .y = 41 };
             state.dependencies.internal.memory_usage_window.visible = true;
         }
 
@@ -253,11 +255,11 @@ fn drawInternalUI(state: *State) void {
     // Game state inspector
     {
         imgui.c.ImGui_SetNextWindowPosEx(
-            imgui.c.ImVec2{ .x = 10, .y = 100 },
+            imgui.c.ImVec2{ .x = 5, .y = 95 },
             imgui.c.ImGuiCond_FirstUseEver,
             imgui.c.ImVec2{ .x = 0, .y = 0 },
         );
-        imgui.c.ImGui_SetNextWindowSize(imgui.c.ImVec2{ .x = 300, .y = 285 }, imgui.c.ImGuiCond_FirstUseEver);
+        imgui.c.ImGui_SetNextWindowSize(imgui.c.ImVec2{ .x = 300, .y = 275 }, imgui.c.ImGuiCond_FirstUseEver);
 
         _ = imgui.c.ImGui_Begin("Game state", null, imgui.c.ImGuiWindowFlags_NoFocusOnAppearing);
         defer imgui.c.ImGui_End();
