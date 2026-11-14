@@ -79,6 +79,7 @@ pub fn main(init: std.process.Init) !void {
     var manage_imgui_lifecycle: bool = false;
     var internal_dependencies: GameLib.Dependencies.Internal = undefined;
     var memory_usage_window: ?*flint.internal.MemoryUsageWindow = null;
+    var imgui_ini_filename: []const u8 = "";
 
     // Prepare dependencies.
     const dependency_set: GameLib.DependencySet = try game.getDependcyType();
@@ -139,8 +140,8 @@ pub fn main(init: std.process.Init) !void {
         initImgui(window.?, game_renderer, game_gpu_device, game_settings);
         internal_dependencies.imgui_context = imgui.context.?;
 
-        const ini_filename = try flint.fs.getFilePathAbsolute(init.io, "imgui.ini", internal_allocator);
-        imgui.setIniFilename(@ptrCast(ini_filename));
+        imgui_ini_filename = try flint.fs.getFilePathAbsolute(init.io, "imgui.ini", internal_allocator);
+        imgui.setIniFilename(@ptrCast(imgui_ini_filename));
     }
 
     // Init game with the requested dependencies.
@@ -233,6 +234,7 @@ pub fn main(init: std.process.Init) !void {
 
                     if (manage_imgui_lifecycle) {
                         initImgui(window.?, game_renderer, game_gpu_device, game_settings);
+                        imgui.setIniFilename(@ptrCast(imgui_ini_filename));
                     }
                 }
 
